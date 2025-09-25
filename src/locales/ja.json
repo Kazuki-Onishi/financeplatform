@@ -1,0 +1,139 @@
+{
+  "common": {
+    "appName": "カズキ・ファイナンス・プラットフォーム",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "loading": "読み込み中…",
+    "retry": "再試行",
+    "save": "保存",
+    "search": "検索",
+    "select": "選択",
+    "unknown": "不明"
+  },
+  "auth": {
+    "title": "Kazuki Finance にサインイン",
+    "subtitle": "Google またはメールアドレスでサインインして領収書ワークスペースにアクセスします。",
+    "nameLabel": "氏名",
+    "namePlaceholder": "氏名を入力",
+    "emailLabel": "メールアドレス",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "パスワード",
+    "passwordPlaceholder": "パスワードを入力",
+    "passwordHint": "パスワードは {minLength} 文字以上で入力してください。",
+    "googleButton": "Google で続行",
+    "emailSignInButton": "メールでサインイン",
+    "emailSignUpButton": "アカウントを作成",
+    "signedInAs": "サインイン中",
+    "goToDashboard": "ダッシュボードへ移動",
+    "signOut": "サインアウト",
+    "status": {
+      "signedIn": "サインインしました",
+      "signedOut": "サインアウトしました",
+      "googleFailed": "Google サインインに失敗しました",
+      "emailFailed": "メール認証に失敗しました",
+      "signOutFailed": "サインアウトに失敗しました",
+      "requiresName": "氏名を入力してください",
+      "requiresEmail": "メールアドレスを入力してください"
+    }
+  },
+  "upload": {
+    "title": "領収書アップロード",
+    "dropHere": "ここにファイルをドラッグ & ドロップ",
+    "selectFiles": "ファイルを選択",
+    "source": {
+      "label": "アップロード種別",
+      "options": {
+        "receipt": {
+          "label": "領収書",
+          "description": "通常の購入領収書をアップロードします。"
+        },
+        "passbook": {
+          "label": "通帳",
+          "description": "銀行通帳のスキャンをアップロードします。"
+        }
+      }
+    },
+    "purpose": {
+      "label": "利用目的",
+      "none": "目的なし",
+      "noteLabel": "目的備考",
+      "notePlaceholder": "用途メモ (任意)"
+    },
+    "purchasePurpose": {
+      "label": "購入の背景",
+      "placeholder": "例: 備品購入や店舗消耗品など"
+    },
+    "payment": {
+      "label": "支払い方法",
+      "recentBadge": "直近"
+    },
+    "queue": {
+      "empty": "まだファイルが選択されていません。",
+      "columns": {
+        "file": "ファイル名",
+        "size": "サイズ",
+        "status": "状態",
+        "progress": "進捗",
+        "source": "種別"
+      }
+    },
+    "actions": {
+      "process": "アップロードを開始",
+      "processing": "アップロード中…",
+      "clear": "キューをクリア"
+    },
+    "events": {
+      "duplicateExact": "同一ファイルを検出しました",
+      "duplicateLikely": "類似ファイルを検出しました",
+      "uploadComplete": "アップロードが完了しました",
+      "uploadFailed": "アップロードに失敗しました"
+    }
+  },
+  "settings": {
+    "title": "設定",
+    "cards": {
+      "title": "支払いカード管理",
+      "empty": "登録されているカードはありません。",
+      "add": "カードを追加",
+      "edit": "カードを編集",
+      "delete": "カードを削除"
+    },
+    "vendors": {
+      "title": "取引先カタログ",
+      "searchPlaceholder": "取引先を検索…",
+      "empty": "取引先は登録されていません。",
+      "add": "取引先を追加",
+      "edit": "取引先を編集",
+      "delete": "取引先を削除"
+    },
+    "invites": {
+      "title": "チーム招待",
+      "selectStore": "店舗を選択",
+      "createButton": "招待リンクを作成",
+      "refresh": "再読み込み",
+      "empty": "招待はまだありません。",
+      "copyLink": "リンクをコピー",
+      "openLink": "リンクを開く",
+      "revoke": "招待を無効化",
+      "statuses": {
+        "active": "有効",
+        "revoked": "無効"
+      }
+    }
+  },
+  "receipts": {
+    "detail": {
+      "title": "領収書詳細",
+      "summary": "サマリー",
+      "files": "添付ファイル",
+      "activity": "アクティビティ"
+    },
+    "status": {
+      "draft": "下書き",
+      "pending": "処理待ち",
+      "confirmed": "確認済み",
+      "reviewed": "レビュー済み",
+      "locked": "ロック済み"
+    }
+  }
+}

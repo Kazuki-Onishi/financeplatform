@@ -1,0 +1,6 @@
+diff --git a/src/app/dashboard/upload/page.tsx b/src/app/dashboard/upload/page.tsx
+--- a/src/app/dashboard/upload/page.tsx
++++ b/src/app/dashboard/upload/page.tsx
+@@
+-import type { ReceiptDoc, ReceiptSummaryData } from "@/types/receipt";
++import type { ReceiptDoc, ReceiptPaymentMethod, ReceiptPaymentMethodType, ReceiptSummaryData } from "@/types/receipt";

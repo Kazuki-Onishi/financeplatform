@@ -1,0 +1,126 @@
+rules_version = "2";
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function currentPermissions() {
+      return isSignedIn()
+        ? get(/databases/$(database)/documents/userPermissions/$(request.auth.uid))
+        : null;
+    }
+
+    function hasStorePermission(storeId) {
+      let permsDoc = currentPermissions();
+      return permsDoc != null && permsDoc.data != null && permsDoc.data.storeIds != null && storeId in permsDoc.data.storeIds;
+    }
+
+    function userHasFlag(flag) {
+      let permsDoc = currentPermissions();
+      return permsDoc != null && permsDoc.data != null && permsDoc.data.flags != null && flag in permsDoc.data.flags;
+    }
+
+    match /userPermissions/{uid} {
+      allow get, list: if isSignedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /userStoreRoles/{docId} {
+      allow get, list: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && (resource.data.isResigned != true);
+      allow write: if false;
+    }
+
+    match /roleTemplates/{id} {
+      allow get, list: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /stores/{storeId} {
+      allow get: if isSignedIn() && hasStorePermission(storeId);
+      allow list: if false;
+      allow write: if false;
+    }
+
+    function receiptRequestStoreId() {
+      return request.resource.data.storeId;
+    }
+
+    function receiptResourceStoreId() {
+      return resource.data.storeId;
+    }
+
+    function hasReceiptRequestAccess() {
+      return receiptRequestStoreId() != null && hasStorePermission(receiptRequestStoreId());
+    }
+
+    function hasReceiptResourceAccess() {
+      return receiptResourceStoreId() != null && hasStorePermission(receiptResourceStoreId());
+    }
+
+    match /creditCards/{cardId} {
+      function canReadCard() {
+        return isSignedIn()
+          && userHasFlag("perm.manageCards")
+          && (resource.data.storeId == null || hasStorePermission(resource.data.storeId));
+      }
+
+      function canWriteCard() {
+        return isSignedIn()
+          && userHasFlag("perm.manageCards");
+      }
+
+      allow get, list: if canReadCard();
+
+      allow create: if canWriteCard()
+        && (request.resource.data.storeId == null || hasStorePermission(request.resource.data.storeId));
+
+      allow update: if canWriteCard()
+        && (resource.data.storeId == request.resource.data.storeId)
+        && ((resource.data.storeId == null || hasStorePermission(resource.data.storeId))
+          && (request.resource.data.storeId == null || hasStorePermission(request.resource.data.storeId)));
+
+      allow delete: if canWriteCard()
+        && (resource.data.storeId == null || hasStorePermission(resource.data.storeId));
+    }
+
+    match /vendors/{vendorId} {
+      function canManageVendors() {
+        return isSignedIn() && userHasFlag("perm.manageVendors");
+      }
+
+      allow get, list: if canManageVendors();
+
+      allow create, update, delete: if canManageVendors();
+    }
+
+    match /receipts/{receiptId} {
+      allow get, list: if isSignedIn() && hasReceiptResourceAccess();
+
+      allow create: if isSignedIn() && hasReceiptRequestAccess();
+
+      allow update: if isSignedIn() && hasReceiptResourceAccess()
+        && request.resource.data.storeId == resource.data.storeId;
+
+      allow delete: if false;
+    }
+
+    match /receipts/{receiptId}/assets/{assetId} {
+      function parentReceipt() {
+        return get(/databases/$(database)/documents/receipts/$(receiptId));
+      }
+
+      function hasAssetAccess() {
+        let receipt = parentReceipt();
+        return receipt != null && receipt.data != null && receipt.data.storeId != null && hasStorePermission(receipt.data.storeId);
+      }
+
+      allow get, list: if isSignedIn() && hasAssetAccess();
+      allow create, update: if isSignedIn() && hasAssetAccess();
+      allow delete: if false;
+    }
+  }
+}
