@@ -1,53 +1,39 @@
 {
-    "indexes":  [
-                    {
-                        "collectionGroup":  "receipts",
-                        "queryScope":  "COLLECTION",
-                        "fields":  [
-                                       {
-                                           "fieldPath":  "storeId",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "createdAt",
-                                           "order":  "DESCENDING"
-                                       }
-                                   ]
-                    },
-                    {
-                        "collectionGroup":  "receipts",
-                        "queryScope":  "COLLECTION",
-                        "fields":  [
-                                       {
-                                           "fieldPath":  "storeId",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "status",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "createdAt",
-                                           "order":  "DESCENDING"
-                                       }
-                                   ]
-                    },
-                    {
-                        "collectionGroup":  "creditCards",
-                        "queryScope":  "COLLECTION",
-                        "fields":  [
-                                       {
-                                           "fieldPath":  "storeId",
-                                           "order":  "ASCENDING"
-                                       },
-                                       {
-                                           "fieldPath":  "brand",
-                                           "order":  "ASCENDING"
-                                       }
-                                   ]
-                    }
-                ],
-    "fieldOverrides":  [
-
-                       ]
+    "indexes": [
+        {
+            "collectionGroup": "receipts",
+            "queryScope": "COLLECTION",
+            "fields": [
+                { "fieldPath": "storeId", "order": "ASCENDING" },
+                { "fieldPath": "createdAt", "order": "DESCENDING" }
+            ]
+        },
+        {
+            "collectionGroup": "receipts",
+            "queryScope": "COLLECTION",
+            "fields": [
+                { "fieldPath": "storeId", "order": "ASCENDING" },
+                { "fieldPath": "status", "order": "ASCENDING" },
+                { "fieldPath": "createdAt", "order": "DESCENDING" }
+            ]
+        },
+        {
+            "collectionGroup": "creditCards",
+            "queryScope": "COLLECTION",
+            "fields": [
+                { "fieldPath": "storeId", "order": "ASCENDING" },
+                { "fieldPath": "brand", "order": "ASCENDING" }
+            ]
+        },
+        {
+            "collectionGroup": "receipts",
+            "queryScope": "COLLECTION",
+            "fields": [
+                { "fieldPath": "storeId", "order": "ASCENDING" },
+                { "fieldPath": "uploaderId", "order": "ASCENDING" },
+                { "fieldPath": "createdAt", "order": "DESCENDING" }
+            ]
+        }
+    ],
+    "fieldOverrides": []
 }

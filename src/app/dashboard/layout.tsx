@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 const NAV_ITEMS: Array<{ href: string; label: string }> = [
   { href: "/dashboard/receipts", label: "Receipts" },
+  { href: "/dashboard/passbooks", label: "Passbooks" },
   { href: "/dashboard/upload", label: "Upload" },
   { href: "/dashboard/settings", label: "Settings" },
   { href: "/dashboard/analytics", label: "Analytics" },
@@ -13,20 +14,27 @@ const NAV_ITEMS: Array<{ href: string; label: string }> = [
 
 function resolveActive(pathname: string | null, href: string): boolean {
   if (!pathname) return false;
-  if (href === "/dashboard/receipts") {
-    return pathname === href || pathname.startsWith("/dashboard/receipts/");
+  if (href === "/dashboard/receipts" || href === "/dashboard/passbooks") {
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function DashboardLayout({ children }: { children: ReactNode }): JSX.Element {
+export default function DashboardLayout({
+  children,
+}: {
+  children: ReactNode;
+}): JSX.Element {
   const pathname = usePathname();
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
       <header className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link href="/dashboard/receipts" className="text-lg font-semibold text-neutral-900">
+          <Link
+            href="/dashboard/receipts"
+            className="text-lg font-semibold text-neutral-900"
+          >
             Kazuki Finance
           </Link>
           <nav className="flex items-center gap-2">

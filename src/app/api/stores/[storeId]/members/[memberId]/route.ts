@@ -41,10 +41,10 @@ export async function PATCH(
 ): Promise<Response> {
   try {
     const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer \")) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return jsonResponse({ error: "Unauthorized" }, { status: 401 });
     }
-    const token = authHeader.slice("Bearer \".length).trim();
+    const token = authHeader.slice("Bearer ".length).trim();
     let decoded;
     try {
       decoded = await adminAuth.verifyIdToken(token);

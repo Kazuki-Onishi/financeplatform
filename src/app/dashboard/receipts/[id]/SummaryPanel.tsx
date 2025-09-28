@@ -59,6 +59,8 @@ interface SummaryPanelProps {
   onReceiptUpdate: React.Dispatch<React.SetStateAction<ReceiptRecord | null>>;
   previews?: SummaryPreview[];
   maxLineItems?: number;
+  onConfirm?: () => void;
+  confirmDisabled?: boolean;
 }
 
 const DEFAULT_FORM: SummaryFormState = {
@@ -121,7 +123,38 @@ function generateLineItemId(): string {
   return `line-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpdate, previews = [], maxLineItems = MAX_LINE_ITEMS }: SummaryPanelProps) {
+function normaliseTaxRate(
+  raw: number | null,
+  totalAmount: number | null,
+  fallbackTaxAmount?: number | null,
+): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const abs = Math.abs(raw);
+    if (abs === 0) {
+      return 0;
+    }
+    if (abs <= 1) {
+      return Math.round(abs * 10000) / 100;
+    }
+    if (abs <= 100) {
+      return Math.round(abs * 100) / 100;
+    }
+    if (totalAmount && totalAmount !== 0) {
+      return Math.round((abs / totalAmount) * 10000) / 100;
+    }
+  }
+  if (
+    typeof fallbackTaxAmount === "number" &&
+    Number.isFinite(fallbackTaxAmount) &&
+    totalAmount &&
+    totalAmount !== 0
+  ) {
+    return Math.round((fallbackTaxAmount / totalAmount) * 10000) / 100;
+  }
+  return null;
+}
+
+export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpdate, previews = [], maxLineItems = MAX_LINE_ITEMS, onConfirm, confirmDisabled }: SummaryPanelProps) {
   const [summaryForm, setSummaryForm] = useState<SummaryFormState>(DEFAULT_FORM);
   const [summaryMeta, setSummaryMeta] = useState<SummaryMetaState>(DEFAULT_META);
   const [summaryDirty, setSummaryDirty] = useState(false);
@@ -162,6 +195,14 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
 
   useEffect(() => {
     const nextSummary = receipt.summary ?? null;
+    const summaryAmountValue =
+      typeof nextSummary?.amount === "number" && Number.isFinite(nextSummary.amount)
+        ? nextSummary.amount
+        : typeof receipt.ocr?.amount === "number" && Number.isFinite(receipt.ocr.amount)
+        ? receipt.ocr.amount
+        : null;
+    const ocrTaxAmount =
+      typeof receipt.ocr?.tax === "number" && Number.isFinite(receipt.ocr.tax) ? receipt.ocr.tax : null;
     const summaryPurpose = nextSummary?.purpose ?? null;
     const resolvedPurposeOption = summaryPurpose?.key ? findPurposeOption(summaryPurpose.key) : undefined;
     const fallbackPurposeOption = (
@@ -187,24 +228,34 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       ? nextSummary.items
           .filter((item): item is ReceiptSummaryLineItem => item !== null && typeof item === "object")
           .slice(0, maxLineItems)
-          .map((item) => ({
-            id: typeof item.id === "string" ? item.id : generateLineItemId(),
-            label: typeof item.label === "string" ? item.label : "",
-            amount:
-              typeof item.amount === "number" && Number.isFinite(item.amount) ? item.amount : null,
-            tax:
-              typeof item.tax === "number" && Number.isFinite(item.tax) ? item.tax : null,
-            taxRate:
-              typeof item.taxRate === "number" && Number.isFinite(item.taxRate) ? item.taxRate : null,
-            memo: typeof item.memo === "string" ? item.memo : "",
-          }))
+          .map((item) => {
+            const amount =
+              typeof item.amount === "number" && Number.isFinite(item.amount) ? item.amount : null;
+            const taxAmount =
+              typeof item.tax === "number" && Number.isFinite(item.tax) ? item.tax : null;
+            const taxRateValue =
+              typeof item.taxRate === "number" && Number.isFinite(item.taxRate) ? item.taxRate : null;
+            const baseAmount = amount ?? summaryAmountValue;
+            return {
+              id: typeof item.id === "string" ? item.id : generateLineItemId(),
+              label: typeof item.label === "string" ? item.label : "",
+              amount,
+              tax: taxAmount,
+              taxRate: normaliseTaxRate(taxRateValue, baseAmount, taxAmount),
+              memo: typeof item.memo === "string" ? item.memo : "",
+            };
+          })
       : [];
 
     setSummaryForm({
       date: nextSummary?.date ?? receipt.ocr?.date ?? null,
       vendor: nextSummary?.vendor ?? receipt.ocr?.vendorName ?? null,
-      amount: nextSummary?.amount ?? receipt.ocr?.amount ?? null,
-      tax: nextSummary?.tax ?? receipt.ocr?.tax ?? null,
+      amount: summaryAmountValue,
+      tax: normaliseTaxRate(
+        typeof nextSummary?.tax === "number" && Number.isFinite(nextSummary.tax) ? nextSummary.tax : null,
+        summaryAmountValue,
+        ocrTaxAmount,
+      ),
       currency: nextSummary?.currency ?? receipt.ocr?.currency ?? "JPY",
       memo: nextSummary?.memo ?? receipt.memo ?? null,
       purposeKey: initialPurposeKey,
@@ -402,15 +453,34 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       }
 
       const summaryResult = await callSummarize(text);
-      setSummaryForm((prev) => ({
-        ...prev,
-        date: summaryResult.summary.date ?? null,
-        vendor: summaryResult.summary.vendor ?? null,
-        amount: summaryResult.summary.amount ?? null,
-        tax: summaryResult.summary.tax ?? null,
-        currency: summaryResult.summary.currency ?? "JPY",
-        memo: summaryResult.summary.memo ?? null,
-      }));
+      setSummaryForm((prev) => {
+        const resultAmount =
+          typeof summaryResult.summary.amount === "number" && Number.isFinite(summaryResult.summary.amount)
+            ? summaryResult.summary.amount
+            : null;
+        const fallbackAmount =
+          typeof receipt.ocr?.amount === "number" && Number.isFinite(receipt.ocr.amount)
+            ? receipt.ocr.amount
+            : null;
+        const nextAmount = resultAmount ?? fallbackAmount ?? prev.amount;
+        const resultTax =
+          typeof summaryResult.summary.tax === "number" && Number.isFinite(summaryResult.summary.tax)
+            ? summaryResult.summary.tax
+            : null;
+        const fallbackTaxAmount =
+          typeof receipt.ocr?.tax === "number" && Number.isFinite(receipt.ocr.tax)
+            ? receipt.ocr.tax
+            : null;
+        return {
+          ...prev,
+          date: summaryResult.summary.date ?? null,
+          vendor: summaryResult.summary.vendor ?? null,
+          amount: nextAmount,
+          tax: normaliseTaxRate(resultTax, nextAmount, fallbackTaxAmount),
+          currency: summaryResult.summary.currency ?? "JPY",
+          memo: summaryResult.summary.memo ?? null,
+        };
+      });
       setSummaryMeta({
         language: summaryResult.language ?? null,
         keywords: summaryResult.keywords ?? [],
@@ -439,6 +509,15 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       pushToast("error", "Storage bucket configuration is missing or file path is invalid.");
       return;
     }
+    const wasConfirmed = receipt.status === "confirmed";
+    if (wasConfirmed) {
+      const proceed = window.confirm(
+        "This receipt was already confirmed. Editing will move it back to Reviewed until you confirm again. Continue?",
+      );
+      if (!proceed) {
+        return;
+      }
+    }
     setSaving(true);
     setError(null);
     try {
@@ -465,15 +544,13 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
           const trimmedMemo = item.memo.trim();
           const amountValue =
             typeof item.amount === "number" && Number.isFinite(item.amount) ? item.amount : null;
-          const taxValue =
-            typeof item.tax === "number" && Number.isFinite(item.tax) ? item.tax : null;
           const taxRateValue =
             typeof item.taxRate === "number" && Number.isFinite(item.taxRate) ? item.taxRate : null;
           return {
             id: item.id,
             label: trimmedLabel ? trimmedLabel : null,
             amount: amountValue,
-            tax: taxValue,
+            tax: null,
             taxRate: taxRateValue,
             memo: trimmedMemo ? trimmedMemo : null,
           };
@@ -516,14 +593,20 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
         gcsUri: gcsInfo.gcsUri,
       };
 
-      await updateDoc(receiptDoc(receipt.id), {
+      const updatePayload: Record<string, unknown> = {
         ocr: ocrPayload,
         summary: summaryPayload,
         file: filePayload,
         purpose: purposePayload?.label ?? null,
         updatedAt: serverTimestamp(),
         "meta.manualEdits": true,
-      });
+      };
+
+      if (wasConfirmed) {
+        updatePayload.status = "reviewed";
+      }
+
+      await updateDoc(receiptDoc(receipt.id), updatePayload);
 
       onReceiptUpdate((prev) =>
         prev
@@ -533,6 +616,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               summary: summaryPayload,
               file: filePayload,
               purpose: purposePayload?.label ?? null,
+              status: wasConfirmed ? "reviewed" : prev.status,
               meta: {
                 ...prev.meta,
                 manualEdits: true,
@@ -541,7 +625,12 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
           : prev,
       );
       setSummaryDirty(false);
-      pushToast("success", "Summary saved.");
+      pushToast(
+        wasConfirmed ? "info" : "success",
+        wasConfirmed
+          ? "Summary updated. Status reverted to reviewed - please confirm again."
+          : "Summary saved.",
+      );
     } catch (err) {
       console.error("Failed to save summary", err);
       const message = (err as Error).message ?? "Failed to save summary.";
@@ -579,6 +668,16 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
           >
             {saving ? "Saving..." : "Save Summary"}
           </button>
+          {onConfirm ? (
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={confirmDisabled}
+              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Confirm
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -719,10 +818,12 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-neutral-500">Tax (JPY)</span>
+            <span className="text-neutral-500">Tax rate (%)</span>
             <input
               type="number"
               inputMode="decimal"
+              min={0}
+              step="0.01"
               value={summaryForm.tax ?? ""}
               onChange={(event) => {
                 const value = event.target.value;
@@ -862,7 +963,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                         ) : null}
                       </label>
                       <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-500">Net amount (JPY)</span>
+                        <span className="text-neutral-500">Amount (tax included, JPY)</span>
                         <input
                           type="number"
                           inputMode="decimal"
@@ -871,23 +972,6 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                             handleLineItemChange(
                               item.id,
                               "amount",
-                              event.target.value ? Number.parseFloat(event.target.value) : null,
-                            )
-                          }
-                          className="rounded border border-neutral-300 px-3 py-2"
-                          disabled={!canEdit}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-500">Tax amount (JPY)</span>
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          value={item.tax ?? ""}
-                          onChange={(event) =>
-                            handleLineItemChange(
-                              item.id,
-                              "tax",
                               event.target.value ? Number.parseFloat(event.target.value) : null,
                             )
                           }

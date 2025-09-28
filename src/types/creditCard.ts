@@ -10,8 +10,10 @@ export interface CreditCardDoc {
   last4: string;
   /** Friendly display name. */
   nickname: string;
-  /** Optional owner user id (null for shared cards). */
+  /** Optional single owner for legacy compatibility. */
   userId?: string | null;
+  /** Optional list of owners allowed to use this card. */
+  userIds?: string[] | null;
   /** Optional store-scoped card. */
   storeId?: string | null;
   createdAt: Timestamp;

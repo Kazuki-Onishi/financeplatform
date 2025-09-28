@@ -1,0 +1,171 @@
+    source: summary ? "summary" : "ocr",
+
+
+
+  };
+
+
+
+  let remainingBreakdown = breakdown;
+
+
+
+  if (main.amount === null) {
+
+
+
+    if (remainingBreakdown.length) {
+
+
+
+      const [first, ...rest] = remainingBreakdown;
+
+
+
+      main = { ...first, key: `${row.id}-main-item-${first.key}` };
+
+
+
+      remainingBreakdown = rest;
+
+
+
+    } else {
+
+
+
+      const ocrAmount =
+
+
+
+        typeof row.ocr?.amount === "number" && Number.isFinite(row.ocr.amount)
+
+
+
+          ? row.ocr.amount
+
+
+
+          : null;
+
+
+
+      main = {
+
+
+
+        key: `${row.id}-main-ocr`,
+
+
+
+        amount: ocrAmount,
+
+
+
+        taxRate: normaliseTaxRate(
+
+
+
+          typeof row.ocr?.tax === "number" && Number.isFinite(row.ocr.tax)
+
+
+
+            ? row.ocr.tax
+
+
+
+            : null,
+
+
+
+          ocrAmount,
+
+
+
+          typeof row.ocr?.tax === "number" && Number.isFinite(row.ocr.tax)
+
+
+
+            ? row.ocr.tax
+
+
+
+            : undefined,
+
+
+
+        ),
+
+
+
+        label: null,
+
+
+
+        source: "ocr",
+
+
+
+      };
+
+
+
+    }
+
+
+
+  }
+
+
+
+  if (main.taxRate === null && main.amount) {
+
+
+
+    main.taxRate = normaliseTaxRate(
+
+
+
+      null,
+
+
+
+      main.amount,
+
+
+
+      typeof row.ocr?.tax === "number" && Number.isFinite(row.ocr.tax)
+
+
+
+        ? row.ocr.tax
+
+
+
+        : undefined,
+
+
+
+    );
+
+
+
+  }
+
+
+
+  return { currency, main, breakdown: remainingBreakdown };
+
+
+
+}
+
+
+
+export default function ReceiptsPage() {
+
+
+
+  const router = useRouter();
+
+

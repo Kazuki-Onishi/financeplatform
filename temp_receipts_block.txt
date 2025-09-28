@@ -1,0 +1,141 @@
+const SYNC_TIMEOUT_MS = 10_000;
+
+
+
+interface ReceiptRow extends ReceiptRecord {
+
+
+
+  viewUrl?: string | null;
+
+
+
+  thumbUrl?: string | null;
+
+
+
+}
+
+
+
+interface ToastMessage {
+
+
+
+  id: string;
+
+
+
+  type: "success" | "error" | "info";
+
+
+
+  message: string;
+
+
+
+}
+
+
+
+const ALL_STORES_OPTION = "all" as const;
+
+
+
+const STATUS_OPTIONS: ("all" | ReceiptStatus)[] = ["all", "draft", "pending", "confirmed", "reviewed", "locked"];
+
+
+
+function formatJst(timestamp: Timestamp): string {
+
+
+
+  const date = timestamp.toDate();
+
+
+
+  return new Intl.DateTimeFormat("en-GB", {
+
+
+
+    timeZone: "Asia/Tokyo",
+
+
+
+    year: "numeric",
+
+
+
+    month: "2-digit",
+
+
+
+    day: "2-digit",
+
+
+
+    hour: "2-digit",
+
+
+
+    minute: "2-digit",
+
+
+
+  }).format(date);
+
+
+
+}
+
+
+
+function formatAmount(amount: number | null, currency: string): string {
+
+
+
+  if (amount === null || Number.isNaN(amount)) {
+
+
+
+    return "?";
+
+
+
+  }
+
+
+
+  return new Intl.NumberFormat("ja-JP", {
+
+
+
+    style: "currency",
+
+
+
+    currency,
+
+
+
+    currencyDisplay: "code",
+
+
+
+    minimumFractionDigits: 0,
+
+
+
+  }).format(amount);
+
+
+
+}
+
+
+
+function describePayment(row: ReceiptRecord): string {
+
+
+
+  const method = row.paymentMethod;

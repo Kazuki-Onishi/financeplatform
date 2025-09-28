@@ -16,6 +16,7 @@ interface CreateInviteBody {
   maxUses?: unknown;
   expiresAt?: unknown;
   note?: unknown;
+  targetUserId?: unknown;
 }
 
 function hasManagePermission(member: StoreMemberDoc | null): boolean {
@@ -141,6 +142,9 @@ export async function GET(
         maxUses: data.maxUses,
         used: data.used,
         note: data.note ?? null,
+        targetUserId: data.targetUserId ?? null,
+        targetEmail: data.targetEmail ?? null,
+        targetDisplayName: data.targetDisplayName ?? null,
         link: `/invites/accept?token=${encodeURIComponent(data.token)}`,
       };
     });
@@ -192,9 +196,58 @@ export async function POST(
 
     const role = normaliseRole(body.role) ?? "staff";
     const flags = parseFlags(body.flags);
-    const maxUses = parseMaxUses(body.maxUses);
+    let maxUses = parseMaxUses(body.maxUses);
     const expiresDate = parseExpires(body.expiresAt);
-    const note = typeof body.note === "string" ? body.note.slice(0, 160) : null;
+    let note = typeof body.note === "string" ? body.note.slice(0, 160) : null;
+    const rawTargetUserId = typeof body.targetUserId === "string" ? body.targetUserId.trim() : "";
+    let targetUserId: string | null = null;
+    let targetEmail: string | null = null;
+    let targetDisplayName: string | null = null;
+
+
+    if (rawTargetUserId) {
+      try {
+        const userRecord = await adminAuth.getUser(rawTargetUserId);
+        targetUserId = userRecord.uid;
+        targetEmail = userRecord.email ?? null;
+        targetDisplayName = userRecord.displayName ?? null;
+      } catch (error) {
+        console.warn("[invites] target user not found", rawTargetUserId, error);
+        return jsonResponse({ error: "Target user not found" }, { status: 404 });
+      }
+
+      if (!targetUserId) {
+        return jsonResponse({ error: "Target user not found" }, { status: 404 });
+      }
+
+      const targetMemberSnap = await storeRef.collection("members").doc(targetUserId).get();
+      if (targetMemberSnap.exists) {
+        return jsonResponse({ error: "User is already a member of this store." }, { status: 409 });
+      }
+
+      const directInviteSnap = await storeRef
+        .collection("invites")
+        .where("targetUserId", "==", targetUserId)
+        .get();
+      const hasActiveInvite = directInviteSnap.docs.some((doc) => {
+        const data = doc.data() as StoreInviteDoc;
+        return data.status === "active";
+      });
+      if (hasActiveInvite) {
+        return jsonResponse({ error: "User already has an active invite." }, { status: 409 });
+      }
+
+      maxUses = 1;
+      if (!note) {
+        if (targetEmail) {
+          note = `Direct invite for ${targetEmail}`;
+        } else if (targetDisplayName) {
+          note = `Direct invite for ${targetDisplayName}`;
+        } else if (targetUserId) {
+          note = `Direct invite for ${targetUserId}`;
+        }
+      }
+    }
 
     const inviteRef = storeRef.collection("invites").doc();
 
@@ -215,6 +268,12 @@ export async function POST(
       used: 0,
       note,
     };
+
+    if (targetUserId) {
+      invitePayload.targetUserId = targetUserId;
+      invitePayload.targetEmail = targetEmail ?? null;
+      invitePayload.targetDisplayName = targetDisplayName ?? null;
+    }
 
     const batch = adminDb.batch();
     batch.set(inviteRef, invitePayload);
@@ -237,6 +296,9 @@ export async function POST(
         maxUses,
         expiresAt: expiresDate ? expiresDate.toISOString() : null,
         note,
+        targetUserId,
+        targetEmail,
+        targetDisplayName,
         link: `/invites/accept?token=${encodeURIComponent(tokenValue)}`,
       },
       { status: 201 },

@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+echo "vision-invoker-key.json" >> .gitignore
+
+vision-invoker-key.json
+# もしくは全般的に *.json 鍵を除外するなら
+*.json

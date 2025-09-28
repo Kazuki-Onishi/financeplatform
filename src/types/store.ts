@@ -45,6 +45,9 @@ export interface StoreInviteDoc {
   flags: PermissionFlag[];
   status: StoreInviteStatus;
   note?: string | null;
+  targetUserId?: string | null;
+  targetEmail?: string | null;
+  targetDisplayName?: string | null;
 }
 
 export interface StoreInviteRecord extends StoreInviteDoc {

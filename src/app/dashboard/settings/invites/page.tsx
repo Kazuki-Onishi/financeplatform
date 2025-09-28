@@ -26,6 +26,9 @@ interface InviteListItem {
   createdAt: string;
   expiresAt: string;
   note: string | null;
+  targetUserId?: string | null;
+  targetEmail?: string | null;
+  targetDisplayName?: string | null;
 }
 
 interface InviteFormState {
@@ -35,6 +38,16 @@ interface InviteFormState {
   expiresInDays: string;
   note: string;
 }
+
+interface InviteSearchResult {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  status: "available" | "member" | "invited";
+}
+
+
 
 const ROLE_OPTIONS: Array<{ value: StoreMemberRole; label: string; description: string }> = [
   { value: "owner", label: "Owner", description: "Full access. Grants all permissions including invites." },
@@ -108,6 +121,13 @@ export default function SettingsInvitesPage(): JSX.Element {
   const [creating, setCreating] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [userSearchResults, setUserSearchResults] = useState<InviteSearchResult[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [userSearchError, setUserSearchError] = useState<string | null>(null);
+  const [directInviteRole, setDirectInviteRole] = useState<StoreMemberRole>("staff");
+  const [directInviteFlags, setDirectInviteFlags] = useState<PermissionFlag[]>(["perm.upload", "perm.view"]);
+  const [directInviteSending, setDirectInviteSending] = useState<string | null>(null);
 
   const pushToast = useCallback((type: ToastMessage["type"], message: string) => {
     const id = crypto.randomUUID();
@@ -185,6 +205,13 @@ export default function SettingsInvitesPage(): JSX.Element {
     void handleLoadInvites(selectedStoreId);
   }, [selectedStoreId, handleLoadInvites]);
 
+  useEffect(() => {
+    setUserSearchResults([]);
+    setUserSearchError(null);
+    setUserSearchQuery("");
+    setDirectInviteSending(null);
+  }, [selectedStoreId]);
+
   const toggleFlag = useCallback((flag: PermissionFlag) => {
     setFormState((prev) => {
       const hasFlag = prev.flags.includes(flag);
@@ -192,6 +219,120 @@ export default function SettingsInvitesPage(): JSX.Element {
       return { ...prev, flags: uniqueFlags(nextFlags) };
     });
   }, []);
+
+  const toggleDirectFlag = useCallback((flag: PermissionFlag) => {
+    setDirectInviteFlags((prev) => {
+      const hasFlag = prev.includes(flag);
+      const nextFlags = hasFlag ? prev.filter((item) => item !== flag) : uniqueFlags([...prev, flag]);
+      return nextFlags;
+    });
+  }, []);
+
+  const handleSearchUsers = useCallback(async () => {
+    const storeId = selectedStoreId;
+    if (!storeId) {
+      pushToast("error", "Select a store first.");
+      return;
+    }
+    const query = userSearchQuery.trim();
+    if (!query) {
+      setUserSearchResults([]);
+      setUserSearchError(null);
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      pushToast("error", "You must be signed in to manage invites.");
+      return;
+    }
+    setSearchingUsers(true);
+    setUserSearchError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const params = new URLSearchParams({ query, limit: "10" });
+      const response = await fetch(
+        `/api/stores/${encodeURIComponent(storeId)}/invites/search?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        },
+      );
+      const payload = (await response.json().catch(() => null)) as { users?: InviteSearchResult[]; error?: string } | null;
+      if (!response.ok || !payload?.users) {
+        const message = payload?.error ?? "Failed to search users.";
+        setUserSearchResults([]);
+        setUserSearchError(message);
+        return;
+      }
+      setUserSearchResults(payload.users);
+    } catch (error) {
+      console.error("[settings] failed to search users", error);
+      setUserSearchResults([]);
+      setUserSearchError("Network error while searching users.");
+    } finally {
+      setSearchingUsers(false);
+    }
+  }, [pushToast, selectedStoreId, userSearchQuery]);
+
+  const handleClearUserSearch = useCallback(() => {
+    setUserSearchResults([]);
+    setUserSearchError(null);
+  }, []);
+
+  const handleSendDirectInvite = useCallback(
+    async (user: InviteSearchResult) => {
+      const storeId = selectedStoreId;
+      if (!storeId) {
+        pushToast("error", "Select a store first.");
+        return;
+      }
+      if (user.status !== "available") {
+        return;
+      }
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        pushToast("error", "You must be signed in to manage invites.");
+        return;
+      }
+      setDirectInviteSending(user.uid);
+      try {
+        const idToken = await currentUser.getIdToken();
+        const response = await fetch(`/api/stores/${encodeURIComponent(storeId)}/invites`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            role: directInviteRole,
+            flags: directInviteFlags,
+            targetUserId: user.uid,
+          }),
+        });
+        const payload = (await response.json().catch(() => null)) as { id?: string; error?: string } | null;
+        if (!response.ok || !payload?.id) {
+          const message = payload?.error ?? "Failed to create invite.";
+          pushToast("error", message);
+          return;
+        }
+        pushToast(
+          "success",
+          `Invite sent to ${user.email ?? user.displayName ?? user.uid}.`,
+        );
+        setUserSearchResults((prev) =>
+          prev.map((item) => (item.uid === user.uid ? { ...item, status: "invited" } : item)),
+        );
+        await handleLoadInvites(storeId);
+      } catch (error) {
+        console.error("[settings] failed to create direct invite", error);
+        pushToast("error", "Network error while creating invite.");
+      } finally {
+        setDirectInviteSending(null);
+      }
+    },
+    [directInviteFlags, directInviteRole, handleLoadInvites, pushToast, selectedStoreId],
+  );
 
   const handleCreateInvite = useCallback(async () => {
     const storeId = selectedStoreId;
@@ -486,6 +627,138 @@ export default function SettingsInvitesPage(): JSX.Element {
       ) : null}
 
       {selectedStoreId ? (
+        <section className="flex flex-col gap-4 rounded border border-neutral-200 p-4">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold text-neutral-900">Invite existing user</h2>
+            <p className="text-xs text-neutral-500">
+              Search for an existing account and send a one-time invite with the selected role and permissions.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <label className="flex w-full flex-col gap-1 text-sm md:max-w-sm">
+              <span className="text-neutral-500">Search users</span>
+              <input
+                type="text"
+                value={userSearchQuery}
+                onChange={(event) => setUserSearchQuery(event.target.value)}
+                placeholder="Search by email, name, or user ID"
+                className="rounded border border-neutral-300 px-3 py-2"
+                disabled={disableActions || searchingUsers}
+              />
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleSearchUsers}
+                disabled={disableActions || searchingUsers}
+                className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-400"
+              >
+                {searchingUsers ? "Searching..." : "Search"}
+              </button>
+              <button
+                type="button"
+                onClick={handleClearUserSearch}
+                disabled={userSearchResults.length === 0 && !userSearchError}
+                className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-neutral-500">Role</span>
+              <select
+                value={directInviteRole}
+                onChange={(event) => setDirectInviteRole(event.target.value as StoreMemberRole)}
+                disabled={disableActions || searchingUsers || directInviteSending !== null}
+                className="rounded border border-neutral-300 px-3 py-2"
+              >
+                {ROLE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-neutral-400">
+                {ROLE_OPTIONS.find((option) => option.value === directInviteRole)?.description ?? ""}
+              </span>
+            </label>
+            <fieldset className="flex flex-col gap-2 text-sm md:col-span-1">
+              <legend className="text-neutral-500">Permission flags</legend>
+              <div className="grid gap-2">
+                {FLAG_OPTIONS.map((option) => {
+                  const checked = directInviteFlags.includes(option.value);
+                  return (
+                    <label
+                      key={option.value}
+                      className="flex items-start gap-2 rounded border border-neutral-200 bg-neutral-50 p-2 text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleDirectFlag(option.value)}
+                        disabled={disableActions || searchingUsers || directInviteSending !== null}
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="font-medium text-neutral-700">{option.label}</span>
+                        <span className="block text-[11px] text-neutral-500">{option.description}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </div>
+          {userSearchError ? (
+            <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{userSearchError}</div>
+          ) : null}
+          {searchingUsers && !userSearchResults.length ? (
+            <p className="text-sm text-neutral-500">Searching users...</p>
+          ) : null}
+          {!searchingUsers && !userSearchResults.length && !userSearchError ? (
+            <p className="text-sm text-neutral-500">Enter an email or name to find teammates with existing accounts.</p>
+          ) : null}
+          {userSearchResults.length ? (
+            <div className="flex flex-col gap-2">
+              {userSearchResults.map((user) => {
+                const disabled = user.status !== "available" || disableActions || directInviteSending === user.uid;
+                const statusLabel =
+                  user.status === "available"
+                    ? "Available"
+                    : user.status === "member"
+                    ? "Already a member"
+                    : "Invite pending";
+                return (
+                  <div
+                    key={user.uid}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded border border-neutral-200 bg-white p-3"
+                  >
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-neutral-800">
+                        {user.displayName ?? user.email ?? user.uid}
+                      </span>
+                      <span className="text-xs text-neutral-500">{user.email ?? "Email not available"}</span>
+                      <span className="text-[11px] text-neutral-400">{statusLabel}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSendDirectInvite(user)}
+                      disabled={disabled}
+                      className="rounded border border-neutral-300 px-3 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {directInviteSending === user.uid ? "Sending..." : "Send invite"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {selectedStoreId ? (
         <section className="flex flex-col gap-3">
           <header className="flex items-center justify-between">
             <div>
@@ -542,6 +815,12 @@ export default function SettingsInvitesPage(): JSX.Element {
                 ) : (
                   <span className="text-xs text-neutral-400">No extra flags granted.</span>
                 )}
+
+                {invite.targetUserId ? (
+                  <p className="text-xs text-neutral-500">
+                    Direct invite for {invite.targetEmail ?? invite.targetDisplayName ?? invite.targetUserId}
+                  </p>
+                ) : null}
 
                 {invite.note ? (
                   <p className="text-xs text-neutral-500">Note: {invite.note}</p>

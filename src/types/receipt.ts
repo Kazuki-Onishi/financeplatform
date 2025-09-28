@@ -63,6 +63,7 @@ export interface ReceiptSummaryData {
     note?: string | null;
   } | null;
   purchasePurpose?: string | null;
+  advancePayment?: boolean;
   source: string | null;
   edited: boolean;
   language?: string | null;
@@ -134,6 +135,8 @@ export interface ReceiptDoc {
   purpose?: string | null;
   /** Free-form purchase purpose context captured during upload. */
   purchasePurpose?: string | null;
+  /** Whether the expense was fronted for reimbursement. */
+  advancePayment?: boolean;
   memo?: string | null;
   paymentMethod?: ReceiptPaymentMethod;
   summary?: ReceiptSummaryData | null;

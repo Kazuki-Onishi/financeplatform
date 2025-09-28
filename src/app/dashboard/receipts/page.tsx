@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -21,7 +21,7 @@ import { getDownloadURL, ref } from "firebase/storage";
 import { auth, db, storage } from "../../../lib/firebase/client";
 import { useUserPermissions } from "../../../lib/hooks/useUserPermissions";
 import { runBulkAnalysis } from "../../../lib/api.client";
-import type { ReceiptRecord, ReceiptStatus, ReceiptFraudFlag } from "../../../types/receipt";
+import type { ReceiptRecord, ReceiptStatus, ReceiptFraudFlag, ReceiptSummaryLineItem } from "../../../types/receipt";
 import type { StoreDoc } from "../../../types/store";
 
 const RECEIPTS_FLAG = process.env.NEXT_PUBLIC_APPFLAG_RECEIPTS === "on";
@@ -65,6 +65,17 @@ function formatAmount(amount: number | null, currency: string): string {
   }).format(amount);
 }
 
+function formatTaxRate(rate: number | null): string {
+  if (typeof rate !== "number" || !Number.isFinite(rate)) {
+    return "-";
+  }
+  const hasFraction = Math.abs(rate % 1) > 0;
+  return `${rate.toLocaleString("ja-JP", {
+    maximumFractionDigits: hasFraction ? 2 : 0,
+    minimumFractionDigits: hasFraction ? 2 : 0,
+  })}%`;
+}
+
 function describePayment(row: ReceiptRecord): string {
   const method = row.paymentMethod;
   if (!method) {
@@ -87,6 +98,141 @@ function fallbackThumbPath(viewPath?: string, filePath?: string): string | null 
   }
   const parent = base.slice(0, index);
   return `${parent}/thumb.webp`;
+}
+
+interface SummaryCandidate {
+  amount: number | null;
+  tax: number | null;
+  currency?: string | null;
+  items?: ReceiptSummaryLineItem[] | null;
+}
+
+type DisplaySource = "summary" | "ocr" | "item";
+
+interface DisplaySummaryLine {
+  key: string;
+  amount: number | null;
+  taxRate: number | null;
+  label?: string | null;
+  source: DisplaySource;
+}
+
+function toSummaryCandidate(value: unknown): SummaryCandidate | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const candidate = value as Partial<SummaryCandidate>;
+  return {
+    amount:
+      typeof candidate.amount === "number" && Number.isFinite(candidate.amount)
+        ? candidate.amount
+        : null,
+    tax:
+      typeof candidate.tax === "number" && Number.isFinite(candidate.tax)
+        ? candidate.tax
+        : null,
+    currency:
+      typeof candidate.currency === "string" && candidate.currency.trim()
+        ? candidate.currency
+        : null,
+    items: Array.isArray(candidate.items)
+      ? candidate.items.filter((item): item is ReceiptSummaryLineItem => Boolean(item))
+      : null,
+  };
+}
+
+function normaliseTaxRate(
+  raw: number | null,
+  totalAmount: number | null,
+  fallbackTaxAmount?: number | null,
+): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const abs = Math.abs(raw);
+    if (abs === 0) {
+      return 0;
+    }
+    if (abs <= 1) {
+      return Math.round(abs * 10000) / 100;
+    }
+    if (abs <= 100) {
+      return Math.round(abs * 100) / 100;
+    }
+    if (totalAmount && totalAmount !== 0) {
+      return Math.round((abs / totalAmount) * 10000) / 100;
+    }
+  }
+  if (
+    typeof fallbackTaxAmount === "number" &&
+    Number.isFinite(fallbackTaxAmount) &&
+    totalAmount &&
+    totalAmount !== 0
+  ) {
+    return Math.round((fallbackTaxAmount / totalAmount) * 10000) / 100;
+  }
+  return null;
+}
+
+function buildDisplaySummary(row: ReceiptRow): {
+  currency: string;
+  main: DisplaySummaryLine;
+  breakdown: DisplaySummaryLine[];
+} {
+  const summary = toSummaryCandidate(row.summary ?? null);
+  const currency = summary?.currency ?? row.ocr?.currency ?? "JPY";
+
+  const ocrAmount =
+    typeof row.ocr?.amount === "number" && Number.isFinite(row.ocr.amount) ? row.ocr.amount : null;
+  const ocrTax = typeof row.ocr?.tax === "number" && Number.isFinite(row.ocr.tax) ? row.ocr.tax : null;
+  const summaryAmountValue = summary?.amount ?? null;
+
+  const breakdownCandidates = summary?.items ?? [];
+  const breakdown = breakdownCandidates
+    .map((item, index) => {
+      const amount = typeof item.amount === "number" && Number.isFinite(item.amount) ? item.amount : null;
+      const taxAmount = typeof item.tax === "number" && Number.isFinite(item.tax) ? item.tax : null;
+      const taxRateValue =
+        typeof item.taxRate === "number" && Number.isFinite(item.taxRate) ? item.taxRate : null;
+      const baseAmount = amount ?? summaryAmountValue ?? ocrAmount;
+      return {
+        key: item.id ?? `item-${index}`,
+        amount,
+        taxRate: normaliseTaxRate(taxRateValue, baseAmount, taxAmount),
+        label: item.label ?? null,
+        source: "item" as DisplaySource,
+      };
+    })
+    .filter((entry) => entry.amount !== null || entry.taxRate !== null || (entry.label && entry.label.trim().length));
+
+  let main: DisplaySummaryLine = {
+    key: `${row.id}-main`,
+    amount: summaryAmountValue,
+    taxRate: normaliseTaxRate(summary?.tax ?? null, summaryAmountValue, ocrTax ?? undefined),
+    label: null,
+    source: summary ? "summary" : "ocr",
+  };
+
+  let remainingBreakdown = breakdown;
+  if (main.amount === null) {
+    if (remainingBreakdown.length) {
+      const [first, ...rest] = remainingBreakdown;
+      main = { ...first, key: `${row.id}-main-item-${first.key}` };
+      remainingBreakdown = rest;
+    } else {
+      main = {
+        key: `${row.id}-main-ocr`,
+        amount: ocrAmount,
+        taxRate: normaliseTaxRate(null, ocrAmount, ocrTax ?? undefined),
+        label: null,
+        source: "ocr",
+      };
+    }
+  }
+
+  if (main.taxRate === null && main.amount !== null) {
+    main.taxRate = normaliseTaxRate(null, main.amount, ocrTax ?? undefined);
+  }
+
+  return { currency, main, breakdown: remainingBreakdown };
 }
 
 export default function ReceiptsPage() {
@@ -334,6 +480,8 @@ export default function ReceiptsPage() {
               month: data.month,
               purpose: data.purpose ?? null,
               paymentMethod: data.paymentMethod,
+              summary: (data.summary ?? null) as ReceiptRow["summary"],
+              advancePayment: data.advancePayment === true,
               ocr: data.ocr,
               meta: data.meta,
               fraudFlags: Array.isArray(data.fraudFlags) ? (data.fraudFlags as ReceiptFraudFlag[]) : [],
@@ -699,59 +847,111 @@ export default function ReceiptsPage() {
                 <th className="p-3 text-left">Date</th>
                 <th className="p-3 text-left">Vendor</th>
                 <th className="p-3 text-right">Amount</th>
+                <th className="p-3 text-right">Tax (%)</th>
                 <th className="p-3 text-left">Status</th>
                 <th className="p-3 text-left">Uploader</th>
                 <th className="p-3 text-left">Purpose</th>
                 <th className="p-3 text-left">Payment</th>
+                <th className="p-3 text-center">Advance</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td className="p-6 text-center text-neutral-500" colSpan={9}>
+                  <td className="p-6 text-center text-neutral-500" colSpan={11}>
                     {loading ? "Loading receiptsc" : storeId ? "No receipts found." : "Select a store to view receipts."}
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
-                  <tr key={row.id} className="border-t border-neutral-100 hover:bg-neutral-50">
-                    <td className="p-3">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 align-middle"
-                        checked={selectedIds.includes(row.id)}
-                        onChange={() => toggleSelect(row.id)}
-                        aria-label={`Select receipt ${row.id}`}
-                      />
-                    </td>
-                    <td className="p-3">
-                      {row.thumbUrl ? (
-                        <Image
-                          src={row.thumbUrl}
-                          alt="Thumb"
-                          width={64}
-                          height={64}
-                          className="h-16 w-16 rounded object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <span className="text-xs text-neutral-400">No thumb</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-neutral-700">{formatJst(row.createdAt)}</td>
-                    <td className="p-3 text-neutral-700">{row.ocr.vendorName ?? "?"}</td>
-                    <td className="p-3 text-right text-neutral-700">{formatAmount(row.ocr.amount, row.ocr.currency)}</td>
-                    <td className="p-3 text-neutral-700">
-                      <Link className="text-blue-600 hover:underline" href={`/dashboard/receipts/${row.id}`}>
-                        {row.status}
-                      </Link>
-                    </td>
-                    <td className="p-3 text-neutral-700">{row.uploaderName || row.uploaderId}</td>
-                    <td className="p-3 text-neutral-700">{row.purpose ?? "?"}</td>
-                    <td className="p-3 text-neutral-700">{describePayment(row)}</td>
-                  </tr>
-                ))
+                rows.map((row) => {
+                  const { currency, main, breakdown } = buildDisplaySummary(row);
+                  const amountCellClassName = `p-3 text-right text-neutral-700${breakdown.length ? " align-top" : ""}`;
+                  const taxCellClassName = `p-3 text-right text-neutral-700${breakdown.length ? " align-top" : ""}`;
+                  const hasMainTaxRate = typeof main.taxRate === "number" && Number.isFinite(main.taxRate);
+                  const mainTaxDisplayClassName = hasMainTaxRate ? "font-medium" : "text-neutral-400";
+                  const mainTaxDisplay = formatTaxRate(main.taxRate);
+
+                  return (
+                    <Fragment key={row.id}>
+                      <tr className="border-t border-neutral-100 hover:bg-neutral-50">
+                        <td className="p-3">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 align-middle"
+                            checked={selectedIds.includes(row.id)}
+                            onChange={() => toggleSelect(row.id)}
+                            aria-label={`Select receipt ${row.id}`}
+                          />
+                        </td>
+                        <td className="p-3">
+                          {row.thumbUrl ? (
+                            <Image
+                              src={row.thumbUrl}
+                              alt="Thumb"
+                              width={64}
+                              height={64}
+                              className="h-16 w-16 rounded object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <span className="text-xs text-neutral-400">No thumb</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-neutral-700">{formatJst(row.createdAt)}</td>
+                        <td className="p-3 text-neutral-700">{row.ocr.vendorName ?? "?"}</td>
+                        <td className={amountCellClassName}>
+                          <div className="font-medium">{formatAmount(main.amount, currency)}</div>
+                          {main.source === "ocr" ? (
+                            <div className="text-[11px] uppercase text-neutral-400">OCR</div>
+                          ) : null}
+                        </td>
+                        <td className={taxCellClassName}>
+                          <div className={mainTaxDisplayClassName}>{mainTaxDisplay}</div>
+                        </td>
+                        <td className="p-3 text-neutral-700">
+                          <Link className="text-blue-600 hover:underline" href={`/dashboard/receipts/${row.id}`}>
+                            {row.status}
+                          </Link>
+                        </td>
+                        <td className="p-3 text-neutral-700">{row.uploaderName || row.uploaderId}</td>
+                        <td className="p-3 text-neutral-700">{row.purpose ?? "?"}</td>
+                        <td className="p-3 text-neutral-700">{describePayment(row)}</td>
+                        <td className="p-3 text-center text-neutral-700">{row.advancePayment ? "〇" : ""}</td>
+                      </tr>
+                      {breakdown.map((entry) => {
+                        const hasEntryTaxRate = typeof entry.taxRate === "number" && Number.isFinite(entry.taxRate);
+                        const entryTaxDisplay = formatTaxRate(entry.taxRate);
+                        const breakdownLabel =
+                          entry.label && entry.label.trim().length
+                            ? entry.label
+                            : hasEntryTaxRate
+                            ? `Tax ${entryTaxDisplay}`
+                            : "Tax bucket";
+                        const entryTaxDisplayClassName = hasEntryTaxRate ? "text-neutral-600" : "text-neutral-400";
+                        return (
+                          <tr
+                            key={`${row.id}-${entry.key}`}
+                            className="border-t border-neutral-100 bg-neutral-50 text-xs text-neutral-600"
+                          >
+                            <td className="p-3"></td>
+                            <td className="p-3" colSpan={3}>
+                              <span className="text-neutral-500">{"-> "}{breakdownLabel}</span>
+                            </td>
+                            <td className="p-3 text-right text-neutral-700">
+                              <div>{formatAmount(entry.amount, currency)}</div>
+                            </td>
+                            <td className="p-3 text-right text-neutral-500">
+                              <div className={entryTaxDisplayClassName}>{entryTaxDisplay}</div>
+                            </td>
+                            <td className="p-3" colSpan={5}></td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  );
+                })
               )}
+
             </tbody>
           </table>
         </div>
@@ -779,7 +979,6 @@ export default function ReceiptsPage() {
     </div>
   );
 }
-
 
 
 

@@ -268,8 +268,17 @@ function isJwtLike(token: string): boolean {
 
 function b64urlToUtf8(input: string): string {
   const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = normalized.length % 4 ? 4 - (normalized.length % 4) : 0;
-  return Buffer.from(normalized + "=".repeat(pad), "base64").toString("utf8");
+  const remainder = normalized.length % 4;
+  const padLength = (4 - remainder) & 3;
+  let pad = "";
+  if (padLength === 1) {
+    pad = "=";
+  } else if (padLength === 2) {
+    pad = "==";
+  } else if (padLength === 3) {
+    pad = "===";
+  }
+  return Buffer.from(normalized + pad, "base64").toString("utf8");
 }
 
 function decodeJwtParts(token: string):
