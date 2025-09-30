@@ -73,6 +73,15 @@ export interface ReceiptSummaryData {
   items?: ReceiptSummaryLineItem[] | null;
 }
 
+export interface ReceiptPassbookEntry {
+  rawDate: string | null;
+  date: string | null;
+  description: string | null;
+  withdrawal: number | null;
+  deposit: number | null;
+  balance: number | null;
+}
+
 export interface ReceiptOcrData {
   /** Normalised purchase date (ISO, Asia/Tokyo). */
   date: string | null;
@@ -90,6 +99,7 @@ export interface ReceiptOcrData {
   currency: "JPY";
   /** Tax portion of amount if supplied. */
   tax: number | null;
+  passbookEntries?: ReceiptPassbookEntry[] | null;
   /** Free-form memo extracted/entered by user. */
   memo: string | null;
   /** Primary source of the OCR data (vision, gemini, manual, etc.). */

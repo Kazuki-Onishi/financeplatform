@@ -1,4 +1,4 @@
-﻿export const runtime = "nodejs";
+export const runtime = "nodejs";
 
 import { NextRequest } from "next/server";
 import { adminAuth, adminDb } from "../../../../../../lib/firebase/admin";
@@ -26,10 +26,10 @@ function matchesQuery(user: UserRecord, query: string): boolean {
   const uid = user.uid.toLowerCase();
   const phone = user.phoneNumber?.toLowerCase() ?? "";
   return (
-    (email && email.includes(lower)) ||
-    (name && name.includes(lower)) ||
+    email.includes(lower) ||
+    name.includes(lower) ||
     uid.includes(lower) ||
-    (phone && phone.includes(lower))
+    phone.includes(lower)
   );
 }
 

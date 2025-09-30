@@ -1,7 +1,6 @@
-﻿
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { auth } from "@/lib/firebase/client";
 import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
@@ -35,8 +34,18 @@ export default function OnboardingPage() {
     hasPreload &&
     preloadPermissions.hasData &&
     (preloadPermissions.userId === null || currentUid === null || preloadPermissions.userId === currentUid);
-  const preloadStoreIds = sameUserPreload ? preloadPermissions.storeIds : [];
-  const storeIds = preloadStoreIds.length ? preloadStoreIds : permissions?.storeIds ?? [];
+  const preloadStoreIds = useMemo(() => {
+    if (!sameUserPreload) {
+      return [];
+    }
+    return preloadPermissions.storeIds;
+  }, [sameUserPreload, preloadPermissions.storeIds]);
+  const storeIds = useMemo(() => {
+    if (preloadStoreIds.length) {
+      return preloadStoreIds;
+    }
+    return permissions?.storeIds ?? [];
+  }, [preloadStoreIds, permissions?.storeIds]);
   const onboardingBusy = (!sameUserPreload && !authReady) || (loading && !sameUserPreload);
   const redirectedRef = useRef(false);
   const { dispatch } = usePermissionsStore();
@@ -247,6 +256,3 @@ export default function OnboardingPage() {
     </div>
   );
 }
-
-
-

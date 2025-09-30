@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@/lib/i18n/I18nProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 
@@ -118,6 +119,7 @@ export function useUploadForm({
   featureDisabled,
   currentUid,
 }: UseUploadFormParams): UseUploadFormResult {
+  const tInfo = useTranslations("upload.information");
   const [storeId, setStoreId] = useState<string>("");
   const storeHistoryLoadedRef = useRef(false);
 
@@ -718,9 +720,9 @@ export function useUploadForm({
   const hasStoresAvailable = isHydrated && storeOptions.length > 0;
   const storeSelectDisabled = !isHydrated || !storeOptions.length || (permissionsBusy && !permissions);
   const storeSelectTitle = !isHydrated
-    ? "Loading stores"
+    ? tInfo("storeLoading")
     : !storeOptions.length
-    ? "No stores available"
+    ? tInfo("storeEmpty")
     : undefined;
 
   return {

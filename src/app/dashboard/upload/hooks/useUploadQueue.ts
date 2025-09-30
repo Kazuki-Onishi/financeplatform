@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import {
@@ -16,6 +16,7 @@ import {
 import { ref, uploadBytesResumable, type UploadMetadata, type UploadTask } from "firebase/storage";
 
 import { auth, db, storage } from "@/lib/firebase/client";
+import { useTranslations } from "@/lib/i18n/I18nProvider";
 import { receiptsCollection } from "@/lib/firestoreRefs";
 import { buildReceiptStoragePaths } from "@/lib/storagePaths";
 import { chooseExt } from "@/lib/fileNamer";
@@ -29,6 +30,7 @@ import {
   toWebp,
 } from "@/lib/imageUtil";
 import type { ReceiptDoc, ReceiptPaymentMethod, ReceiptSummaryData } from "@/types/receipt";
+import type { ReceiptPurposeOption } from "@/lib/purposeOptions";
 
 import {
   DUPLICATE_LOOKBACK,
@@ -52,7 +54,7 @@ import type {
 } from "../types";
 
 type PurposeContext = {
-  option: { key: string; label: string; requiresNote?: boolean } | undefined;
+  option: ReceiptPurposeOption | null;
   sanitizedNote: string;
   trimmedNote: string;
   bucket: string;
@@ -102,6 +104,10 @@ export function useUploadQueue({
   getAdvancePayment,
   getPaymentMethodContext,
 }: UseUploadQueueParams): UseUploadQueueResult {
+  const tQueue = useTranslations("upload.queue");
+  const tToasts = useTranslations("upload.toasts");
+  const tErrors = useTranslations("upload.errors");
+  const tPage = useTranslations("upload.page");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [isDropActive, setIsDropActive] = useState(false);
   const [showDropHint, setShowDropHint] = useState(false);
@@ -488,11 +494,11 @@ export function useUploadQueue({
       });
 
       if (featureDisabled) {
-        addToast("info", "Receipts upload is disabled");
+        addToast("info", tToasts("disabled"));
         return;
       }
       if (!storeId) {
-        addToast("error", "Select a store before uploading files");
+        addToast("error", tPage("storeRequired"));
         console.warn("[upload] blocked: no storeId selected (capture)");
         return;
       }
@@ -507,21 +513,22 @@ export function useUploadQueue({
       getPaymentMethodContext,
       getPurchasePurpose,
       storeId,
+      tPage,
+      tToasts,
     ],
   );
 
   const handleFiles = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const filesList = event.target.files;
+      const filesArray = filesList ? Array.from(filesList) : [];
       event.target.value = "";
-      const fileDetails = filesList
-        ? Array.from(filesList).map((f) => ({ name: f.name, type: f.type, size: f.size }))
-        : [];
+      const fileDetails = filesArray.map((f) => ({ name: f.name, type: f.type, size: f.size }));
 
       console.info("[diag] change", {
         hasEvent: true,
         currentTarget: Boolean(event.currentTarget),
-        fileCount: filesList?.length ?? 0,
+        fileCount: filesArray.length,
         names: fileDetails,
       });
 
@@ -533,7 +540,7 @@ export function useUploadQueue({
       console.info("[upload] handleFiles: incoming", {
         disabled: featureDisabled,
         storeId,
-        count: filesList?.length ?? 0,
+        count: filesArray.length,
         types: fileDetails,
         purpose_key: purposeKey,
         purpose_note_len_bucket: enqueueContext.purposeBucket,
@@ -543,16 +550,16 @@ export function useUploadQueue({
       });
 
       if (featureDisabled) {
-        addToast("info", "Receipts upload is disabled");
+        addToast("info", tToasts("disabled"));
         return;
       }
       if (!storeId) {
-        addToast("error", "Select a store before uploading files");
+        addToast("error", tPage("storeRequired"));
         console.warn("[upload] blocked: no storeId selected");
         return;
       }
 
-      enqueueFiles(filesList, "change", enqueueContext);
+      enqueueFiles(filesArray, "change", enqueueContext);
     },
     [
       addToast,
@@ -562,6 +569,8 @@ export function useUploadQueue({
       getPaymentMethodContext,
       getPurchasePurpose,
       storeId,
+      tPage,
+      tToasts,
     ],
   );
 
@@ -635,11 +644,11 @@ export function useUploadQueue({
       });
 
       if (featureDisabled) {
-        addToast("info", "Receipts upload is disabled");
+        addToast("info", tToasts("disabled"));
         return;
       }
       if (!storeId) {
-        addToast("error", "Select a store before uploading files");
+        addToast("error", tPage("storeRequired"));
         console.warn("[upload] blocked: no storeId selected (drop)");
         return;
       }
@@ -654,6 +663,8 @@ export function useUploadQueue({
       getPaymentMethodContext,
       getPurchasePurpose,
       storeId,
+      tPage,
+      tToasts,
     ],
   );
 
@@ -883,17 +894,17 @@ export function useUploadQueue({
           }
 
           updateProgress(item.id, "success", 100);
-          addToast("success", `${item.file.name}: Upload complete`);
+          addToast("success", tToasts("uploadComplete", { file: item.file.name }));
         } catch (error) {
           const firebaseCode = (error as { code?: string })?.code;
           if (firebaseCode === "storage/canceled") {
             console.info("[upload] uploadItem:cancelled", { id: item.id });
-            updateProgress(item.id, "cancelled", 0, "Cancelled");
-            addToast("info", `${item.file.name}: Cancelled`);
+            updateProgress(item.id, "cancelled", 0, tQueue("statuses.cancelled"));
+            addToast("info", tToasts("cancelled", { file: item.file.name }));
           } else {
             console.error("Upload failed", error);
-            updateProgress(item.id, "error", item.progress, "Upload failed");
-            addToast("error", `${item.file.name}: Upload failed`);
+            updateProgress(item.id, "error", item.progress, tToasts("uploadFailed", { file: item.file.name }));
+            addToast("error", tToasts("uploadFailed", { file: item.file.name }));
           }
         } finally {
           uploadTasks.current.delete(item.id);
@@ -907,22 +918,24 @@ export function useUploadQueue({
       getPaymentMethodContext,
       getPurposeContext,
       getPurchasePurpose,
+      tQueue,
+      tToasts,
       updateProgress,
     ],
   );
 
   const uploadReadyItems = useCallback(async () => {
     if (featureDisabled) {
-      addToast("info", "Receipts upload is disabled");
+      addToast("info", tToasts("disabled"));
       return;
     }
     const readyItems = itemsRef.current.filter((item) => item.status === "ready");
     if (!readyItems.length) {
-      addToast("info", "No files ready for upload");
+      addToast("info", tToasts("noFiles"));
       return;
     }
     await Promise.all(readyItems.map((item) => uploadItem(item)));
-  }, [addToast, featureDisabled, uploadItem]);
+  }, [addToast, featureDisabled, tToasts, uploadItem]);
 
   const cancelItem = useCallback(
     (id: string) => {
@@ -951,7 +964,7 @@ export function useUploadQueue({
             next.push({
               ...entry,
               status: "cancelled",
-              error: "Cancelled by user",
+              error: tErrors("cancelledByUser"),
             });
           } else if (entry.status === "success" || entry.status === "error") {
             next.push(entry);
@@ -961,10 +974,10 @@ export function useUploadQueue({
       });
 
       if (!wasUploading && target) {
-        addToast("info", `${target.file.name}: Removed from queue`);
+        addToast("info", tToasts("removed", { file: target.file.name }));
       }
     },
-    [addToast],
+    [addToast, tErrors, tToasts],
   );
 
   const readyCount = items.filter((item) => item.status === "ready").length;
@@ -992,3 +1005,5 @@ export function useUploadQueue({
     cancelItem,
   };
 }
+
+

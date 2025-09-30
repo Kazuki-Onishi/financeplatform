@@ -71,7 +71,7 @@ export function CardsPanel({
   selectedStoreName,
   pushToast,
   loadingPermissions,
-}: CardsPanelProps): JSX.Element {
+}: CardsPanelProps) {
   const [cards, setCards] = useState<CreditCardRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);

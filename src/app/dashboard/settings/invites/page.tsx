@@ -96,7 +96,7 @@ function uniqueFlags(flags: PermissionFlag[]): PermissionFlag[] {
   return Array.from(new Set(flags));
 }
 
-export default function SettingsInvitesPage(): JSX.Element {
+export default function SettingsInvitesPage() {
   const {
     permissions,
     loading: permissionsLoading,

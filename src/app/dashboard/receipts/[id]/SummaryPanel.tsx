@@ -6,7 +6,7 @@ import { serverTimestamp, updateDoc } from "firebase/firestore";
 import { callOCR, callSummarize } from "@/lib/api.client";
 import { receiptDoc } from "@/lib/firestoreRefs";
 import { PURPOSE_NOTE_MAX_LENGTH, PURPOSE_OPTIONS, findPurposeOption } from "@/lib/purposeOptions";
-import type { ReceiptOcrData, ReceiptRecord, ReceiptSummaryData, ReceiptSummaryLineItem } from "@/types/receipt";
+import type { ReceiptOcrData, ReceiptPassbookEntry, ReceiptRecord, ReceiptSummaryData, ReceiptSummaryLineItem } from "@/types/receipt";
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "";
 
@@ -123,6 +123,30 @@ function generateLineItemId(): string {
   return `line-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function formatPassbookNumber(value: number | null): string {
+  if (value === null || Number.isNaN(value)) {
+    return "";
+  }
+  return value.toLocaleString("ja-JP");
+}
+
+function formatPassbookDate(entry: ReceiptPassbookEntry): string {
+  if (entry.rawDate && entry.rawDate.trim().length) {
+    return entry.rawDate.trim();
+  }
+  if (entry.date) {
+    const parts = entry.date.split("-");
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year && month && day) {
+        return `${year.slice(-2)}.${month}.${day}`;
+      }
+    }
+    return entry.date;
+  }
+  return "";
+}
+
 function normaliseTaxRate(
   raw: number | null,
   totalAmount: number | null,
@@ -192,6 +216,13 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
   const activePreview = selectedPreviewId
     ? previews.find((preview) => preview.id === selectedPreviewId) ?? null
     : null;
+  const isPassbook = receipt.sourceType === "passbook";
+  const passbookEntries = useMemo<ReceiptPassbookEntry[]>(() => {
+    const entries = receipt.ocr?.passbookEntries;
+    return Array.isArray(entries) ? (entries as ReceiptPassbookEntry[]) : [];
+  }, [receipt.ocr?.passbookEntries]);
+  const hasPassbookEntries = passbookEntries.length > 0;
+
 
   useEffect(() => {
     const nextSummary = receipt.summary ?? null;
@@ -497,7 +528,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     } finally {
       setLoading(false);
     }
-  }, [canEdit, onReceiptUpdate, pushToast, receipt.filePath]);
+  }, [canEdit, onReceiptUpdate, pushToast, receipt]);
 
   const handleSave = useCallback(async () => {
     if (!canEdit) {
@@ -643,6 +674,88 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
 
   const disableRun = !canEdit || loading || saving;
   const disableSave = !canEdit || saving;
+
+  if (isPassbook) {
+    const rawText = receipt.ocr?.rawText ?? "";
+    return (
+      <section className="flex flex-col gap-4 rounded border border-neutral-200 p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Passbook OCR</h2>
+            <p className="text-sm text-neutral-500">Vision OCR result for bankbook entries.</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleRun}
+              disabled={disableRun}
+              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Processing..." : "Run OCR"}
+            </button>
+            {onConfirm ? (
+              <button
+                type="button"
+                onClick={onConfirm}
+                disabled={confirmDisabled}
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Confirm
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full border border-neutral-200 text-sm">
+            <thead className="bg-neutral-50 text-neutral-600">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">日付</th>
+                <th className="px-3 py-2 text-left font-medium">摘要</th>
+                <th className="px-3 py-2 text-right font-medium">お支払金額</th>
+                <th className="px-3 py-2 text-right font-medium">お預り金額</th>
+                <th className="px-3 py-2 text-right font-medium">差引残高</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hasPassbookEntries ? (
+                passbookEntries.map((entry, index) => (
+                  <tr key={`${index}-${entry.rawDate ?? entry.date ?? index}`} className="border-t border-neutral-200">
+                    <td className="px-3 py-2 text-sm text-neutral-700">{formatPassbookDate(entry) || "-"}</td>
+                    <td className="px-3 py-2 text-sm text-neutral-700">{entry.description ?? ""}</td>
+                    <td className="px-3 py-2 text-right font-mono text-sm text-neutral-700 tabular-nums">
+                      {formatPassbookNumber(entry.withdrawal)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-sm text-neutral-700 tabular-nums">
+                      {formatPassbookNumber(entry.deposit)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-sm text-neutral-800 tabular-nums">
+                      {formatPassbookNumber(entry.balance)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-t border-neutral-200">
+                  <td className="px-3 py-4 text-center text-sm text-neutral-500" colSpan={5}>
+                    OCR で通帳明細を検出できませんでした。
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-neutral-700">OCR テキスト</h3>
+          <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
+            {rawText || "(テキストなし)"}
+          </pre>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-4 rounded border border-neutral-200 p-4">

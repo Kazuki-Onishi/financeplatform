@@ -42,3 +42,101 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+@layer components {
+  .surface-card {
+    border-radius: 1.25rem;
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    background: #ffffff;
+    box-shadow: 0 28px 56px -32px rgba(15, 23, 42, 0.55);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  @media (max-width: 640px) {
+    .surface-card {
+      border-radius: 1rem;
+      box-shadow: 0 20px 40px -30px rgba(15, 23, 42, 0.45);
+    }
+
+    .section-header__icon {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+  }
+
+
+  .surface-card--interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 36px 72px -36px rgba(15, 23, 42, 0.55);
+  }
+
+  .chip-muted,
+  .chip-accent {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .chip-muted {
+    font-weight: 500;
+    color: rgb(71, 85, 105);
+    background: rgba(226, 232, 240, 0.65);
+  }
+
+  .chip-accent {
+    font-weight: 600;
+    color: rgb(37, 99, 235);
+    background: rgba(59, 130, 246, 0.18);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .section-header__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    background: linear-gradient(140deg, rgba(59, 130, 246, 1), rgba(14, 165, 233, 1));
+    color: #ffffff;
+    box-shadow: 0 18px 40px -28px rgba(15, 118, 110, 0.65);
+  }
+
+  .dropzone-visual {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    background: rgba(248, 250, 252, 0.65);
+  }
+
+  .dropzone-visual::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at top, rgba(59, 130, 246, 0.18), transparent 60%),
+      linear-gradient(140deg, rgba(191, 219, 254, 0.6), rgba(255, 255, 255, 0.6));
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 0;
+  }
+
+  .dropzone-visual.is-active::before,
+  .dropzone-visual:hover::before {
+    opacity: 1;
+  }
+
+  .dropzone-visual__inner {
+    position: relative;
+    z-index: 1;
+  }
+}
+

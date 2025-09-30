@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
+
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
 import { AppProviders } from "./providers";
 import "./globals.css";
 
@@ -16,11 +18,15 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const activeStoreId = cookieStore.get("activeStoreId")?.value ?? null;
+  const localeCookie = cookieStore.get("locale")?.value ?? null;
+  const locale = isLocale(localeCookie) ? localeCookie : DEFAULT_LOCALE;
 
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body className="antialiased">
-        <AppProviders initialActiveStoreId={activeStoreId}>{children}</AppProviders>
+        <AppProviders initialActiveStoreId={activeStoreId} initialLocale={locale}>
+          {children}
+        </AppProviders>
       </body>
     </html>
   );

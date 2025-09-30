@@ -3,6 +3,10 @@
 import { type ChangeEvent, type DragEvent, type KeyboardEvent, type RefObject } from "react";
 import clsx from "clsx";
 
+import { useTranslations } from "@/lib/i18n/I18nProvider";
+
+import { UploadGlyph } from "./UploadGlyph";
+
 interface UploadDropzoneProps {
   storeId: string;
   readyCount: number;
@@ -16,8 +20,8 @@ interface UploadDropzoneProps {
   onDragLeave: (event: DragEvent<HTMLDivElement>) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
-  fileInputRef: RefObject<HTMLInputElement>;
-  captureInputRef: RefObject<HTMLInputElement>;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  captureInputRef: RefObject<HTMLInputElement | null>;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onCaptureChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }
@@ -41,6 +45,7 @@ export function UploadDropzone({
   onCaptureChange,
 }: UploadDropzoneProps) {
   const disabled = !storeId;
+  const tDropzone = useTranslations("upload.dropzone");
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (disabled) {
@@ -52,41 +57,53 @@ export function UploadDropzone({
     }
   };
 
+  const buttonTitle = !readyCount
+    ? tDropzone("noFiles")
+    : uploading
+    ? tDropzone("uploading")
+    : tDropzone("createDraftsTitle");
+
   return (
-    <section className="space-y-4 rounded border border-neutral-200 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-medium text-neutral-700">Upload files</h2>
-          <p className="text-xs text-neutral-500">Drag files into the area or use the buttons to select and capture.</p>
+    <section className="surface-card surface-card--interactive flex flex-col gap-6 p-4 sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="section-header">
+          <span className="section-header__icon">
+            <UploadGlyph name="dropzone" className="size-6" />
+          </span>
+          <div className="flex flex-col gap-1">
+            <span className="chip-accent self-start">{tDropzone("step")}</span>
+            <h2 className="text-lg font-semibold text-neutral-900">{tDropzone("title")}</h2>
+            <p className="text-sm text-neutral-500">{tDropzone("description")}</p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
           <button
             type="button"
             onClick={onSelectFilesClick}
             disabled={disabled}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
-            Select files
+            {tDropzone("select")}
           </button>
           <button
             type="button"
             onClick={onCaptureClick}
             disabled={disabled}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
-            Take photo
+            {tDropzone("capture")}
           </button>
           <button
             type="button"
             onClick={onUploadClick}
             disabled={!readyCount || uploading}
             className={clsx(
-              "rounded px-4 py-2 text-sm font-medium text-white",
+              "w-full rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-200 sm:w-auto",
               readyCount && !uploading ? "bg-green-600 hover:bg-green-700" : "bg-neutral-400",
             )}
-            title={!readyCount ? "No files ready" : uploading ? "Uploading..." : "Create drafts"}
+            title={buttonTitle}
           >
-            Create Draft Receipts
+            {tDropzone("createDrafts")}
           </button>
         </div>
       </div>
@@ -105,18 +122,20 @@ export function UploadDropzone({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={clsx(
-          "flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed px-6 py-10 text-center text-sm transition",
+          "dropzone-visual border-2 border-dashed transition",
           disabled
-            ? "cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400"
+            ? "cursor-not-allowed border-slate-200/70 bg-slate-100 text-slate-400"
             : isDropActive
-            ? "cursor-copy border-blue-500 bg-blue-50 text-blue-700"
-            : "cursor-pointer border-neutral-300 bg-neutral-50 text-neutral-600 hover:border-blue-400 hover:bg-blue-50",
+            ? "is-active cursor-copy border-blue-500/80 text-blue-700"
+            : "cursor-pointer border-slate-300/80 text-slate-600 hover:border-blue-400/80",
         )}
         aria-disabled={disabled}
       >
-        <p className="text-sm font-medium text-neutral-700">Drop files to add them</p>
-        <p className="text-xs text-neutral-500">Supported: JPG, PNG, HEIC, WebP, PDF</p>
-        {showDropHint ? <p className="text-xs text-blue-600">Drop files onto this area</p> : null}
+        <div className="dropzone-visual__inner flex flex-col items-center justify-center gap-3 px-4 py-12 text-center sm:px-6 sm:py-14">
+          <p className="text-base font-semibold text-neutral-700">{tDropzone("drop")}</p>
+          <p className="text-sm text-neutral-500">{tDropzone("supported")}</p>
+          {showDropHint ? <p className="text-xs font-medium text-blue-600">{tDropzone("hint")}</p> : null}
+        </div>
       </div>
 
       <input

@@ -1,8 +1,8 @@
-﻿export const metadata = {
+export const metadata = {
   title: "Analytics | Kazuki Finance",
 };
 
-export default function AnalyticsPage(): JSX.Element {
+export default function AnalyticsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded border border-purple-200 bg-purple-50 p-4 text-sm text-purple-700">

@@ -1,3 +1,4 @@
 ﻿"use client";
 
-export { PassbookDetailPage as default } from "../../receipts/[id]/page";
+export { default } from "../../receipts/[id]/page";
+

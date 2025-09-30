@@ -107,7 +107,7 @@ export function MembersPanel({
   storeId,
   storeName,
   pushToast,
-}: MembersPanelProps): JSX.Element {
+}: MembersPanelProps) {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState<string | null>(null);

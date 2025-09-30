@@ -112,7 +112,7 @@ function resolveAmountSourceLabel(
 
 
 
-export default function ReceiptDetailPage(): JSX.Element {
+export default function ReceiptDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const receiptId = Array.isArray(params?.id)
@@ -135,6 +135,7 @@ export default function ReceiptDetailPage(): JSX.Element {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [navigatingPrev, setNavigatingPrev] = useState(false);
   const [navigatingNext, setNavigatingNext] = useState(false);
+  const storeId = receipt?.storeId ?? null;
   const pushToast = useCallback((type: ToastKind, message: string) => {
     const id = crypto.randomUUID();
     setToasts((prev) => [...prev, { id, type, message }]);
@@ -166,9 +167,10 @@ export default function ReceiptDetailPage(): JSX.Element {
         if (cancelled) {
           return;
         }
+        const data = snapshot.data() as ReceiptRecord;
         const record = {
+          ...data,
           id: snapshot.id,
-          ...(snapshot.data() as ReceiptRecord),
         };
         setReceipt(record);
         setFilters(createDefaultFilters(record));
@@ -194,43 +196,49 @@ export default function ReceiptDetailPage(): JSX.Element {
     };
   }, [authReady, permissionsLoading, receiptId]);
   useEffect(() => {
-    if (!receipt?.storeId) {
+    if (!storeId) {
       setStoreName("-");
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const snap = await getDoc(storeDoc(receipt.storeId));
+        const snap = await getDoc(storeDoc(storeId));
         if (!cancelled) {
           const data = snap.data() as { name?: string } | undefined;
-          setStoreName(data?.name?.trim() || receipt.storeId);
+          setStoreName(data?.name?.trim() || storeId);
         }
       } catch (storeError) {
         console.warn("Failed to load store info", storeError);
         if (!cancelled) {
-          setStoreName(receipt.storeId);
+          setStoreName(storeId);
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [receipt?.storeId]);
-  useEffect(() => {
+  }, [storeId]);
+  const previewCandidates = useMemo(() => {
     if (!receipt) {
-      setPreviewUrl(null);
-      return;
+      return [];
     }
-    const candidates = [
+    return [
       receipt.viewPath,
       receipt.file?.path,
       receipt.thumbPath,
       receipt.filePath,
     ];
+  }, [receipt]);
+
+  useEffect(() => {
+    if (!receipt) {
+      setPreviewUrl(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
-      for (const candidate of candidates) {
+      for (const candidate of previewCandidates) {
         const normalised = normaliseStoragePath(
           typeof candidate === "string" ? candidate : undefined,
         );
@@ -257,13 +265,7 @@ export default function ReceiptDetailPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [
-    receipt?.filePath,
-    receipt?.thumbPath,
-    receipt?.viewPath,
-    receipt?.file?.path,
-    receipt?.id,
-  ]);
+  }, [previewCandidates, receipt]);
   useEffect(() => {
     if (!filtersOpen) {
       return;
@@ -863,3 +865,4 @@ export default function ReceiptDetailPage(): JSX.Element {
     </div>
   );
 }
+

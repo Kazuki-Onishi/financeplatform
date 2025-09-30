@@ -36,11 +36,11 @@ export function useUploadToasts() {
   );
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+    const timeouts = timeoutRef.current;
     return () => {
-      if (typeof window === "undefined") {
-        return;
-      }
-      const timeouts = timeoutRef.current;
       timeouts.forEach((timeoutId) => {
         window.clearTimeout(timeoutId);
       });
@@ -50,3 +50,4 @@ export function useUploadToasts() {
 
   return { toasts, addToast, removeToast };
 }
+

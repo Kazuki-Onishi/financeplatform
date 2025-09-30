@@ -1,1 +1,12 @@
-export type ToastType = 'success' | 'error' | 'info';\n\nexport interface ToastMessage {\n  id: string;\n  type: ToastType;\n  message: string;\n}\n\nexport interface StoreOption {\n  id: string;\n  name: string;\n}\n
+export type ToastType = 'success' | 'error' | 'info';
+
+export interface ToastMessage {
+  id: string;
+  type: ToastType;
+  message: string;
+}
+
+export interface StoreOption {
+  id: string;
+  name: string;
+}

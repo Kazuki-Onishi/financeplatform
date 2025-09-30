@@ -30,7 +30,7 @@ function persistStoreHistory(entries: string[]): void {
   }
 }
 
-export default function SettingsPage(): JSX.Element {
+export default function SettingsPage() {
   const router = useRouter();
   const { permissions, loading: permissionsLoading, optimisticMemberships, confirmed, authReady } = useUserPermissions();
   const { profile: userProfile, status: userStatus } = useAppSelector((state) => state.user);
@@ -239,20 +239,8 @@ export default function SettingsPage(): JSX.Element {
     }, 4000);
   }, []);
 
-  if (!RECEIPTS_FLAG) {
-    return (
-      <div className="flex flex-col gap-3 p-6">
-        <h1 className="text-2xl font-semibold">Receipt Settings</h1>
-        <p className="text-sm text-neutral-500">Set NEXT_PUBLIC_APPFLAG_RECEIPTS=on to access this feature.</p>
-      </div>
-    );
-  }
-
-  if (!permissionsBusy && !knownStoreIds.length) {
-    router.replace("/onboarding");
-  }
-
   const storeOptions: StoreOption[] = useMemo(
+
     () => knownStoreIds.map((id) => ({ id, name: storeDetails[id]?.name ?? id })),
     [knownStoreIds, storeDetails],
   );
@@ -318,6 +306,15 @@ export default function SettingsPage(): JSX.Element {
     }
   }, [permissionsBusy, knownStoreIds, router]);
   const noPermissions = !hasCardsPerm && !hasVendorsPerm && !hasMembersPerm;
+
+  if (!RECEIPTS_FLAG) {
+    return (
+      <div className="flex flex-col gap-3 p-6">
+        <h1 className="text-2xl font-semibold">Receipt Settings</h1>
+        <p className="text-sm text-neutral-500">Set NEXT_PUBLIC_APPFLAG_RECEIPTS=on to access this feature.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

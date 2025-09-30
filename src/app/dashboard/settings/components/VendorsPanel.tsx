@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Timestamp,
   addDoc,
   deleteDoc,
   getDocs,
@@ -10,7 +11,6 @@ import {
   query,
   serverTimestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 import { vendorsCollection, vendorDoc } from "@/lib/firestoreRefs";
 import { normalizeVendorName } from "@/lib/vendors";
@@ -30,7 +30,7 @@ interface VendorsPanelProps {
   pushToast: (type: ToastMessage["type"], message: string) => void;
 }
 
-export function VendorsPanel({ canManage, pushToast }: VendorsPanelProps): JSX.Element {
+export function VendorsPanel({ canManage, pushToast }: VendorsPanelProps) {
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);

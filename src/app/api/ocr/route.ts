@@ -3,10 +3,11 @@
 import { NextRequest } from "next/server";
 import type { DocumentReference } from "firebase-admin/firestore";
 import { FieldValue, Timestamp as AdminTimestamp } from "firebase-admin/firestore";
-import type { ReceiptDoc } from "../../../types/receipt";
+import type { ReceiptDoc, ReceiptSourceType } from "../../../types/receipt";
 import type { VendorRecord } from "../../../types/vendor";
 import { adminAuth, adminDb, adminStorage } from "../../../lib/firebase/admin";
 import { normaliseOcrText } from "../../../lib/ocr";
+import { normalisePassbookOcr } from "../../../lib/ocrPassbook";
 import { jsonResponse } from "../../../lib/http";
 import { GoogleAuth, type GoogleAuthOptions } from "google-auth-library";
 
@@ -26,11 +27,7 @@ type OcrRequestBody = {
   receiptId?: unknown;
   gsUri?: unknown;
   mode?: unknown;
-};
-
-type GoogleAuthClientWithEmail = {
-  email?: string;
-  jsonContent?: { client_email?: string } | null;
+  sourceType?: unknown;
 };
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -84,6 +81,12 @@ function parseGsUri(uri: string): { bucket: string; object: string } | null {
   return { bucket, object };
 }
 
+function validateSourceType(value: unknown): ReceiptSourceType | null {
+  if (value === "receipt" || value === "passbook" || value === "label") {
+    return value;
+  }
+  return null;
+}
 let vendorsCache: { data: VendorRecord[]; expiresAt: number } | null = null;
 const VENDORS_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -454,6 +457,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     const receiptId = typeof body.receiptId === "string" ? body.receiptId.trim() : "";
     const gsUri = typeof body.gsUri === "string" ? body.gsUri.trim() : "";
     const mode = resolveMode(body.mode);
+    const requestSourceType = validateSourceType(body.sourceType);
 
     if (!gsUri) return jsonResponse({ error: "gsUri is required", step: _step }, { status: 400 });
 
@@ -514,6 +518,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       }
     }
 
+    const sourceType: ReceiptSourceType | null = receipt?.sourceType ?? requestSourceType ?? null;
+    const isPassbook = sourceType === "passbook";
+
     _step = "gcs.download";
     const { buffer } = await downloadGsFile(gsUri);
 
@@ -533,11 +540,17 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     _step = "ocr.normalise";
-    const vendors = await loadVendors();
     let ocr: ReceiptDoc["ocr"];
-    let vendorMatch: ReturnType<typeof normaliseOcrText>["vendorMatch"];
+    let vendorMatch: ReturnType<typeof normaliseOcrText>["vendorMatch"] | null = null;
     try {
-      ({ ocr, vendorMatch } = normaliseOcrText({ rawText, vendors }));
+      if (isPassbook) {
+        const result = normalisePassbookOcr({ rawText });
+        ocr = result.ocr;
+        vendorMatch = result.vendorMatch;
+      } else {
+        const vendors = await loadVendors();
+        ({ ocr, vendorMatch } = normaliseOcrText({ rawText, vendors }));
+      }
     } catch (error) {
       return jsonResponse(
         {
@@ -582,7 +595,4 @@ export async function POST(request: NextRequest): Promise<Response> {
     return jsonResponse(payload, { status: 500 });
   }
 }
-
-
-
 
