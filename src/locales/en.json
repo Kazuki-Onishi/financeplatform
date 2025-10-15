@@ -1,0 +1,492 @@
+{
+  "common": {
+    "appName": "Kazuki Finance Platform",
+    "cancel": "Cancel",
+    "close": "Close",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "save": "Save",
+    "search": "Search",
+    "select": "Select",
+    "unknown": "Unknown",
+    "language": "Language",
+    "languages": {
+      "en": "English",
+      "ja": "Japanese"
+    }
+  },
+  "auth": {
+    "title": "Sign in to Kazuki Finance",
+    "subtitle": "Use Google or your email address to access the receipts workspace.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Taro Yamada",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Enter password",
+    "passwordHint": "Passwords must contain at least {minLength} characters.",
+    "googleButton": "Continue with Google",
+    "emailSignInButton": "Sign in with email",
+    "emailSignUpButton": "Create account",
+    "signedInAs": "Signed in as",
+    "goToDashboard": "Go to dashboard",
+    "signOut": "Sign out",
+    "status": {
+      "signedIn": "You are signed in.",
+      "signedOut": "You are signed out.",
+      "googleFailed": "Google sign in failed.",
+      "emailFailed": "Email authentication failed.",
+      "signOutFailed": "Sign out failed.",
+      "requiresName": "Please enter your name.",
+      "requiresEmail": "Please enter an email address."
+    }
+  },
+  "upload": {
+    "page": {
+      "title": "Upload Receipts",
+      "description": "Select image files (max 20MB each). Duplicate receipts are blocked using SHA-256 and perceptual hash.",
+      "signedInAs": "Signed in as {name}",
+      "syncBanner": "Membership changes are syncing...",
+      "reload": "Reload",
+      "disabledTitle": "Receipts upload is disabled",
+      "disabledMessage": "Set NEXT_PUBLIC_APPFLAG_RECEIPTS=on to access this feature.",
+      "joined": "Joined the store",
+      "storeRequired": "Select a store before uploading files",
+      "badge": "Upload workspace",
+      "stepLabel": "STEP {index}",
+      "stepsToggle": {
+        "show": "Show quick guide",
+        "hide": "Hide quick guide"
+      },
+      "steps": {
+        "information": "Review defaults",
+        "informationHint": "Pick the store and payment context you will upload for.",
+        "dropzone": "Collect files",
+        "dropzoneHint": "Drag & drop or use the buttons to add receipt images.",
+        "activity": "Track progress",
+        "activityHint": "Monitor queued items and recent results in real time."
+      }
+    },
+    "dropzone": {
+      "title": "Upload files",
+      "description": "Drag files into the area or use the buttons to select and capture.",
+      "select": "Select files",
+      "capture": "Take photo",
+      "createDrafts": "Create drafts",
+      "noFiles": "No files available to upload",
+      "uploading": "Uploading...",
+      "createDraftsTitle": "Create drafts",
+      "drop": "Drop files here to add them",
+      "supported": "Supported: JPG, PNG, HEIC, WebP, PDF",
+      "hint": "Drop files onto this area",
+      "step": "STEP 2"
+    },
+    "queue": {
+      "empty": "No files selected yet",
+      "uploadedBy": "Uploaded by {name}",
+      "source": "Source: {source}",
+      "cancel": "Cancel",
+      "badges": {
+        "DuplicateExact": "Exact duplicate",
+        "DuplicateLikely": "Possible duplicate",
+        "default": "Notice"
+      },
+      "statuses": {
+        "pending": "Pending",
+        "hashing": "Hashing",
+        "ready": "Ready",
+        "blocked": "Blocked",
+        "uploading": "Uploading",
+        "success": "Complete",
+        "error": "Error",
+        "cancelled": "Cancelled"
+      },
+      "title": "Upload Queue",
+      "subtitle": "Review progress for files you're preparing.",
+      "emptyHeader": "No files are queued yet.",
+      "countBadge": "{count} items",
+      "step": "Progress monitor"
+    },
+    "recent": {
+      "title": "Recent activity",
+      "empty": "No uploads yet.",
+      "step": "History",
+      "subtitle": "A live feed of the latest uploads and their status.",
+      "metaSize": "Size: {size}",
+      "metaProgress": "Progress: {progress}%",
+      "metaTime": "Updated at {time}"
+    },
+    "information": {
+      "title": "Upload settings",
+      "description": "Review the store and related settings before uploading.",
+      "reset": "Reset settings",
+      "addStore": "Add store",
+      "viewReceipts": "Open receipts list",
+      "storeLabel": "Store",
+      "storePlaceholder": "Select a store",
+      "storeLoading": "Loading stores...",
+      "storeEmpty": "No stores yet. Add one to start uploading.",
+      "quickLabel": "Recently selected stores",
+      "sourceLabel": "Upload source",
+      "paymentLabel": "Payment method",
+      "paymentRecent": "Recent payment methods",
+      "advanceLabel": "Advance payment",
+      "advanceYes": "Advance payment made",
+      "advanceNo": "No advance payment",
+      "advanceDescription": "Check this if the expense was paid upfront.",
+      "purposeLabel": "Business purpose",
+      "purposeNone": "No purpose",
+      "purposeRecent": "Recent purposes",
+      "purposeNote": "Purpose note",
+      "purposeNotePlaceholder": "Add a note (optional)",
+      "purchaseLabel": "Purchase summary",
+      "purchasePlaceholder": "e.g. store supplies or equipment purchase",
+      "purchaseSelectPlaceholder": "Select purchase purpose",
+      "purchaseOptionCustom": "Other (free text)",
+      "purchaseRecent": "Recent entries",
+      "purchaseOptions": {
+        "restock": "Inventory restock",
+        "menu_development": "New menu development",
+        "event_fair": "Event or fair preparation",
+        "consumables": "Consumables & fixtures restock",
+        "equipment": "Equipment upgrades & repairs",
+        "marketing": "Advertising & promotion"
+      },
+      "paymentBadgeRecent": "Recent",
+      "paymentBadgeSaved": "Saved",
+      "paymentHint": "We'll remember the last few methods you used for this store.",
+      "step": "STEP 1"
+    },
+    "toasts": {
+      "disabled": "Receipts upload is disabled",
+      "noFiles": "No files available to upload",
+      "uploadComplete": "{file} upload complete",
+      "uploadFailed": "{file} upload failed",
+      "cancelled": "Cancelled {file}",
+      "removed": "Removed {file} from the queue"
+    },
+    "errors": {
+      "cancelledByUser": "Cancelled by user"
+    },
+    "source": {
+      "receipt": {
+        "label": "Receipt",
+        "description": "Upload a standard purchase receipt."
+      },
+      "passbook": {
+        "label": "Passbook",
+        "description": "Upload a scanned bank passbook."
+      },
+      "label": "Label"
+    },
+    "purposeOptions": {
+      "raw_materials": "Raw materials (food & drinks)",
+      "supplies_equipment": "Supplies & equipment",
+      "advertising_promotion": "Advertising & promotion",
+      "transport_delivery": "Transport & delivery",
+      "client_entertainment": "Client entertainment & meetings",
+      "utilities_communications": "Utilities & communications",
+      "leases_subscriptions": "Leases & subscriptions",
+      "repairs_maintenance": "Repairs & maintenance",
+      "miscellaneous": "Miscellaneous",
+      "other": "Other (free text)"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "cards": {
+      "title": "Payment cards",
+      "empty": "No cards have been added yet.",
+      "add": "Add card",
+      "edit": "Edit card",
+      "delete": "Delete card"
+    },
+    "vendors": {
+      "title": "Vendor catalog",
+      "searchPlaceholder": "Search vendors",
+      "empty": "No vendors recorded.",
+      "add": "Add vendor",
+      "edit": "Edit vendor",
+      "delete": "Delete vendor"
+    },
+    "invites": {
+      "title": "Team invites",
+      "selectStore": "Select store",
+      "createButton": "Create invite link",
+      "refresh": "Refresh",
+      "empty": "No invites yet.",
+      "copyLink": "Copy link",
+      "openLink": "Open link",
+      "revoke": "Revoke invite",
+      "statuses": {
+        "active": "Active",
+        "revoked": "Revoked"
+      }
+    },
+    "flagDisabled": {
+      "title": "Receipt Settings",
+      "description": "Set NEXT_PUBLIC_APPFLAG_RECEIPTS=on to access this feature."
+    },
+    "pageTitle": "Receipt settings",
+    "pageDescription": "Manage shared payment cards, store members, and the vendor catalogue.",
+    "summary": {
+      "activeStore": "Active store:",
+      "selectedStore": "Selected store:",
+      "signedInAs": "Signed in as:"
+    },
+    "store": {
+      "sectionTitle": "Store selection",
+      "sectionDescription": "Choose which store you want to manage here.",
+      "label": "Store",
+      "allOption": "All stores",
+      "hint": "Select a store to manage its members and store-scoped resources.",
+      "sharedLabel": "Shared across stores"
+    },
+    "tabs": {
+      "cards": {
+        "badge": "Cards",
+        "title": "Manage payment cards",
+        "description": "Add or update cards linked to each store."
+      },
+      "members": {
+        "badge": "Members",
+        "title": "Team members",
+        "description": "Review members and manage invitations for the selected store."
+      },
+      "vendors": {
+        "badge": "Vendors",
+        "title": "Vendor catalogue",
+        "description": "Maintain normalised vendor names and tags."
+      }
+    },
+    "sync": {
+      "message": "Membership changes are syncing...",
+      "reload": "Reload"
+    },
+    "noPermissions": "You do not have permission to manage receipt settings."
+  },
+  "receipts": {
+    "detail": {
+      "title": "Receipt detail",
+      "summary": "Summary",
+      "files": "Files",
+      "activity": "Activity"
+    },
+    "status": {
+      "draft": "Draft",
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "reviewed": "Reviewed",
+      "locked": "Locked"
+    },
+    "page": {
+      "badge": "Receipts workspace",
+      "title": "Receipts",
+      "description": "Filter and inspect uploaded receipts.",
+      "syncBanner": "Membership changes are syncing...",
+      "reload": "Reload",
+      "chips": {
+        "showing": "Showing {count} items",
+        "selected": "Selected {count}",
+        "store": "Store: {label}",
+        "status": "Status: {status}",
+        "range": "Range: {range}",
+        "storeUnselected": "Select store"
+      },
+      "filters": {
+        "store": "Store",
+        "storePlaceholder": "Select a store",
+        "storeLoading": "Loading stores...",
+        "allStores": "All stores",
+        "status": "Status",
+        "statusAll": "All",
+        "start": "Start date",
+        "end": "End date",
+        "rangeDefaultStart": "Start",
+        "rangeDefaultEnd": "Today",
+        "rangeAll": "All dates"
+      },
+      "actions": {
+        "analysisHeading": "Analysis",
+        "analyze": "Analyze selected",
+        "analyzing": "Analyzing...",
+        "analysisSelected": "Selected {count}",
+        "analysisStartedToast": "Analysis started for {count} receipt(s).",
+        "analysisStartedStatus": "Analysis started for {count} receipt(s).",
+        "analysisSummaryStatus": "{success} succeeded, {failed} failed.",
+        "analysisPermissionError": "You do not have permission to analyze receipts.",
+        "analysisSelectPrompt": "Select receipts to analyze.",
+        "analysisError": "Failed to start analysis.",
+        "exportHeading": "Export",
+        "export": "Export CSV",
+        "exporting": "Exporting...",
+        "exportPermissionError": "You do not have permission to export receipts.",
+        "exportSelectStore": "Select a store before exporting.",
+        "exportSpecificStore": "Choose a specific store before exporting.",
+        "exportSignIn": "You must be signed in to export receipts.",
+        "exportGenerating": "Generating CSV...",
+        "exportPreparing": "Preparing download...",
+        "exportComplete": "CSV export complete.",
+        "exportError": "Failed to export CSV.",
+        "exportFailedWithStatus": "Failed to export CSV (status {status}).",
+        "confirm": {
+          "filterSeparator": ", ",
+          "filter": {
+            "store": "Store: {store}",
+            "status": "Status: {status}",
+            "start": "From {date}",
+            "end": "To {date}"
+          },
+          "noFilters": "no filters",
+          "allMatching": "all matching receipts",
+          "atLeast": "at least {count}",
+          "count": "{count}",
+          "message": "Export receipts ({filters}).\nThis will download {count}. Continue?"
+        }
+      },
+      "empty": {
+        "loading": "Loading receipts...",
+        "noResults": "No receipts found.",
+        "selectStore": "Select a store to view receipts."
+      },
+      "table": {
+        "selectAll": "Select all receipts",
+        "header": {
+          "thumb": "Thumb",
+          "date": "Date",
+          "vendor": "Vendor",
+          "amount": "Amount",
+          "tax": "Tax (%)",
+          "status": "Status",
+          "uploader": "Uploader",
+          "purpose": "Purpose",
+          "payment": "Payment",
+          "advance": "Advance"
+        },
+        "noThumb": "No thumb",
+        "altThumbnail": "Receipt thumbnail",
+        "ocrBadge": "OCR",
+        "taxBucket": "Tax bucket"
+      },
+      "advance": {
+        "badge": "Advance",
+        "none": "None"
+      },
+      "guide": {
+        "badge": "Quick guide",
+        "title": "How to register receipt information",
+        "description": "Follow these quick steps to confirm and publish receipt details.",
+        "stepLabel": "STEP {index}",
+        "steps": {
+          "filters": {
+            "title": "Choose filters",
+            "hint": "Pick the store and date range to narrow the list to relevant receipts."
+          },
+          "review": {
+            "title": "Open a receipt",
+            "hint": "Review extracted totals, vendor, and payment details before editing."
+          },
+          "confirm": {
+            "title": "Edit and update status",
+            "hint": "Fill in required fields, then update the status to share the record."
+          }
+        },
+        "toggle": {
+          "show": "Show quick guide",
+          "hide": "Hide quick guide"
+        }
+      },
+      "errors": {
+        "loadReceipts": "Failed to load receipts."
+      }
+    },
+    "detailPage": {
+      "filters": {
+        "status": "Status",
+        "statusAll": "All statuses",
+        "uploader": "Uploader",
+        "startDate": "Start date",
+        "endDate": "End date",
+        "currentUploader": "Current receipt: {uploader}"
+      },
+      "warnings": {
+        "filterMismatch": "Current receipt might fall outside the active filters.",
+        "filterStore": "Store: {store}",
+        "filterStatus": "Status: {status}",
+        "filterUploader": "Uploader ID: {uploader}"
+      },
+      "buttons": {
+        "reset": "Reset",
+        "apply": "Apply",
+        "backToList": "Back to list",
+        "previous": "Previous",
+        "next": "Next",
+        "cancelChanges": "Cancel changes",
+        "confirm": "Confirm",
+        "enhance": "Enhance with AI"
+      },
+      "preview": {
+        "primary": "Receipt"
+      },
+      "amountSource": {
+        "summary": "Summary",
+        "summaryEdited": "Summary (edited)",
+        "summaryAi": "AI summary",
+        "summaryManual": "Manual",
+        "summaryOcr": "OCR",
+        "ocr": "OCR"
+      },
+      "errors": {
+        "disabled": "Receipts feature is disabled.",
+        "notFound": "Receipt not found.",
+        "loadReceipt": "Failed to load receipt.",
+        "loadPrevious": "Failed to load previous receipt.",
+        "loadNext": "Failed to load next receipt.",
+        "loadPreview": "Failed to load preview.",
+        "loadStore": "Failed to load store info.",
+        "notLoaded": "Receipt is not loaded yet.",
+        "noPermission": "You do not have permission to confirm this receipt.",
+        "confirmFailed": "Failed to confirm receipt."
+      },
+      "toasts": {
+        "noPrevious": "No previous receipt.",
+        "noNext": "No next receipt.",
+        "noPendingChanges": "No pending local changes.",
+        "alreadyConfirmed": "Receipt is already confirmed.",
+        "confirmed": "Receipt marked as confirmed.",
+        "enhanceUnavailable": "Enhance action is unavailable in this preview."
+      }
+    }
+  },
+  "passbooks": {
+    "page": {
+      "badge": "Passbook workspace",
+      "title": "Passbook entries",
+      "description": "Review extracted transactions from uploaded passbook images.",
+      "table": {
+        "selectAll": "Select all passbooks",
+        "header": {
+          "date": "Date",
+          "description": "Description",
+          "withdrawal": "Withdrawal",
+          "deposit": "Deposit",
+          "balance": "Balance"
+        },
+        "loading": "Loading passbook entries...",
+        "empty": "No passbook entries found for the selected filters.",
+        "selectStore": "Select a store to view passbook entries.",
+        "noDescription": "(No description)",
+        "extraEntries": "+{count} additional rows"
+      }
+    }
+  },
+  "dashboard": {
+    "nav": {
+      "receipts": "Receipts",
+      "passbooks": "Passbooks",
+      "upload": "Upload",
+      "settings": "Settings",
+      "analytics": "Analytics"
+    }
+  }
+}
