@@ -76,7 +76,9 @@ export async function fetchUserProfiles(uids: string[], options: FetchProfilesOp
         result.set(user.uid, profile);
       });
       response.notFound.forEach((missing) => {
-        if (!missing.uid) return;
+        if (!('uid' in missing) || !missing.uid) {
+          return;
+        }
         const empty = placeholderProfile();
         writeCache(missing.uid, empty, missTtlMs);
         result.set(missing.uid, empty);
