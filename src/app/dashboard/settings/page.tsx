@@ -19,7 +19,7 @@ interface AdminSettingsState {
   members: AdminMemberRecord[];
 }
 
-export default function SettingsPage(): JSX.Element {
+export default function SettingsPage() {
   const [state, setState] = useState<AdminSettingsState>({ stores: [], members: [] });
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
   const [loading, setLoading] = useState(true);
