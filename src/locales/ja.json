@@ -1,139 +1,421 @@
 {
   "common": {
-    "appName": "Kazuki Finance Platform",
-    "cancel": "Cancel",
-    "close": "Close",
-    "loading": "Loading...",
-    "retry": "Retry",
-    "save": "Save",
-    "search": "Search",
-    "select": "Select",
-    "unknown": "Unknown"
+    "appName": "Kazuki ファイナンス プラットフォーム",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "loading": "読み込み中...",
+    "retry": "再試行",
+    "save": "保存",
+    "search": "検索",
+    "select": "選択",
+    "unknown": "不明"
   },
   "auth": {
-    "title": "Sign in to Kazuki Finance",
-    "subtitle": "Use Google or your email address to access the receipts workspace.",
-    "nameLabel": "Name",
-    "namePlaceholder": "Taro Yamada",
-    "emailLabel": "Email address",
+    "title": "Kazuki Finance にサインイン",
+    "subtitle": "Google またはメールアドレスで領収書ワークスペースにアクセスします。",
+    "nameLabel": "名前",
+    "namePlaceholder": "山田 太郎",
+    "emailLabel": "メールアドレス",
     "emailPlaceholder": "you@example.com",
-    "passwordLabel": "Password",
-    "passwordPlaceholder": "Enter password",
-    "passwordHint": "Passwords must contain at least {minLength} characters.",
-    "googleButton": "Continue with Google",
-    "emailSignInButton": "Sign in with email",
-    "emailSignUpButton": "Create account",
-    "signedInAs": "Signed in as",
-    "goToDashboard": "Go to dashboard",
-    "signOut": "Sign out",
+    "passwordLabel": "パスワード",
+    "passwordPlaceholder": "パスワードを入力",
+    "passwordHint": "パスワードは最低 {minLength} 文字以上で入力してください。",
+    "googleButton": "Googleで続行",
+    "emailSignInButton": "メールでサインイン",
+    "emailSignUpButton": "アカウントを作成",
+    "signedInAs": "サインイン中: ",
+    "goToDashboard": "ダッシュボードへ",
+    "signOut": "サインアウト",
     "status": {
-      "signedIn": "You are signed in.",
-      "signedOut": "You are signed out.",
-      "googleFailed": "Google sign in failed.",
-      "emailFailed": "Email authentication failed.",
-      "signOutFailed": "Sign out failed.",
-      "requiresName": "Please enter your name.",
-      "requiresEmail": "Please enter an email address."
+      "signedIn": "サインインしました。",
+      "signedOut": "サインアウトしました。",
+      "googleFailed": "Google サインインに失敗しました。",
+      "emailFailed": "メール認証に失敗しました。",
+      "signOutFailed": "サインアウトに失敗しました。",
+      "requiresName": "名前を入力してください。",
+      "requiresEmail": "メールアドレスを入力してください。"
     }
   },
   "upload": {
-    "title": "Upload receipts",
-    "dropHere": "Drag & drop files here",
-    "selectFiles": "Choose files",
-    "source": {
-      "label": "Upload type",
-      "options": {
-        "receipt": {
-          "label": "Receipt",
-          "description": "Upload standard receipt images."
-        },
-        "passbook": {
-          "label": "Passbook",
-          "description": "Upload scans of bank passbooks."
-        }
+    "page": {
+      "title": "レシートをアップロード",
+      "description": "画像ファイル（最大20MB）を選択してください。SHA-256と類似ハッシュで重複を検知します。",
+      "signedInAs": "サインイン中: {name}",
+      "syncBanner": "メンバーシップの変更を同期しています...",
+      "reload": "再読み込み",
+      "disabledTitle": "レシートのアップロードは無効です",
+      "disabledMessage": "NEXT_PUBLIC_APPFLAG_RECEIPTS=on を設定すると利用できます。",
+      "joined": "店舗に参加しました",
+      "storeRequired": "ファイルをアップロードする前に店舗を選択してください",
+      "badge": "アップロードワークスペース",
+      "stepLabel": "STEP {index}",
+      "stepsToggle": {
+        "show": "クイックガイドを表示",
+        "hide": "クイックガイドを非表示"
+      },
+      "steps": {
+        "information": "設定を確認",
+        "informationHint": "アップロードする店舗と支払い情報を選択してください。",
+        "dropzone": "ファイルを追加",
+        "dropzoneHint": "レシート画像をドラッグ＆ドロップするかボタンで選択してください。",
+        "activity": "進捗を確認",
+        "activityHint": "キュー内の項目と最近の結果をリアルタイムで確認できます。"
       }
     },
-    "purpose": {
-      "label": "Business purpose",
-      "none": "No purpose",
-      "noteLabel": "Purpose note",
-      "notePlaceholder": "Add a note (optional)"
-    },
-    "purchasePurpose": {
-      "label": "Purchase context",
-      "placeholder": "e.g. store supplies, equipment purchase"
-    },
-    "payment": {
-      "label": "Payment method",
-      "recentBadge": "Recent"
+    "dropzone": {
+      "title": "ファイルをアップロード",
+      "description": "領収書のファイルをドラッグ＆ドロップするか、ボタンで追加します。",
+      "select": "ファイルを選択",
+      "capture": "写真を撮影",
+      "createDrafts": "下書きを作成",
+      "noFiles": "アップロードできるファイルがありません",
+      "uploading": "アップロード中...",
+      "createDraftsTitle": "下書きを作成",
+      "drop": "ここにドロップ",
+      "supported": "対応形式: JPG, PNG, HEIC, WebP, PDF",
+      "hint": "このエリアにファイルをドロップしてください",
+      "step": "STEP 2"
     },
     "queue": {
-      "empty": "No files in the queue.",
-      "columns": {
-        "file": "File",
-        "size": "Size",
-        "status": "Status",
-        "progress": "Progress",
-        "source": "Source"
-      }
+      "empty": "まだファイルが選択されていません",
+      "uploadedBy": "アップロード者: {name}",
+      "source": "種別: {source}",
+      "cancel": "キャンセル",
+      "badges": {
+        "DuplicateExact": "完全な重複",
+        "DuplicateLikely": "重複の可能性",
+        "default": "注意"
+      },
+      "statuses": {
+        "pending": "保留",
+        "hashing": "ハッシュ計算中",
+        "ready": "準備完了",
+        "blocked": "ブロック",
+        "uploading": "アップロード中",
+        "success": "完了",
+        "error": "エラー",
+        "cancelled": "キャンセル"
+      },
+      "title": "アップロードキュー",
+      "subtitle": "準備中のファイルの進行状況を確認します。",
+      "emptyHeader": "キューにファイルはありません。",
+      "countBadge": "{count} 件",
+      "step": "進行状況"
     },
-    "actions": {
-      "process": "Start upload",
-      "processing": "Uploading...",
-      "clear": "Clear queue"
+    "recent": {
+      "title": "最近のアクティビティ",
+      "empty": "まだアップロードがありません。",
+      "step": "履歴",
+      "subtitle": "最新のアップロードと結果をリアルタイムに表示します。",
+      "metaSize": "サイズ: {size}",
+      "metaProgress": "進行状況: {progress}%",
+      "metaTime": "更新: {time}"
     },
-    "events": {
-      "duplicateExact": "This file is already registered.",
-      "duplicateLikely": "This file may be a duplicate.",
-      "uploadComplete": "Upload complete.",
-      "uploadFailed": "Upload failed."
+    "information": {
+      "title": "アップロード設定",
+      "description": "アップロード前に店舗と関連設定を確認します。",
+      "reset": "設定をリセット",
+      "addStore": "店舗を追加",
+      "viewReceipts": "レシートを表示",
+      "storeLabel": "店舗",
+      "storePlaceholder": "店舗を選択",
+      "storeLoading": "店舗を読み込み中...",
+      "storeEmpty": "まだ店舗がありません。追加してください。",
+      "quickLabel": "最近選択した店舗",
+      "sourceLabel": "アップロード種別",
+      "paymentLabel": "支払い方法",
+      "paymentRecent": "最近使用した支払い方法",
+      "advanceLabel": "立替精算",
+      "advanceYes": "立替済み",
+      "advanceNo": "立替なし",
+      "advanceDescription": "経費の立替がある場合はオンにしてください。",
+      "purposeLabel": "業務目的",
+      "purposeNone": "目的なし",
+      "purposeRecent": "最近の目的",
+      "purposeNote": "目的メモ",
+      "purposeNotePlaceholder": "メモを追加（任意）",
+      "purchaseLabel": "購入内容",
+      "purchasePlaceholder": "例: 店舗備品や設備の購入",
+      "purchaseRecent": "最近の入力",
+      "purchaseSelectPlaceholder": "購入目的を選択",
+      "purchaseOptionCustom": "その他（自由入力）",
+      "purchaseOptions": {
+        "restock": "通常仕入れ（在庫補充）",
+        "menu_development": "新メニュー開発",
+        "event_fair": "イベント・フェア用",
+        "consumables": "消耗品補充（消耗品・備品）",
+        "equipment": "設備更新・修理",
+        "marketing": "広告・販促用"
+      },
+      "paymentBadgeRecent": "最近",
+      "paymentBadgeSaved": "保存済み",
+      "paymentHint": "この店舗で最近使用した支払い方法を記憶します。",
+      "step": "STEP 1"
+    },
+    "toasts": {
+      "disabled": "レシートのアップロードは無効です",
+      "noFiles": "アップロードできるファイルがありません",
+      "uploadComplete": "{file} のアップロードが完了しました",
+      "uploadFailed": "{file} のアップロードに失敗しました",
+      "cancelled": "{file} をキャンセルしました",
+      "removed": "キューから {file} を削除しました"
+    },
+    "errors": {
+      "cancelledByUser": "ユーザーによりキャンセルされました"
+    },
+    "source": {
+      "receipt": {
+        "label": "領収書",
+        "description": "一般的な領収書をアップロードします。"
+      },
+      "passbook": {
+        "label": "通帳",
+        "description": "銀行通帳のスキャンをアップロードします。"
+      },
+      "label": "ラベル"
+    },
+    "purposeOptions": {
+      "raw_materials": "原材料（飲食）",
+      "supplies_equipment": "消耗品・備品",
+      "advertising_promotion": "広告・販促",
+      "transport_delivery": "交通・配送",
+      "client_entertainment": "接待・会食",
+      "utilities_communications": "光熱費・通信",
+      "leases_subscriptions": "賃貸・サブスク",
+      "repairs_maintenance": "修理・メンテナンス",
+      "miscellaneous": "雑費",
+      "other": "その他（自由入力）"
     }
   },
   "settings": {
-    "title": "Settings",
+    "title": "設定",
     "cards": {
-      "title": "Payment cards",
-      "empty": "No cards have been added yet.",
-      "add": "Add card",
-      "edit": "Edit card",
-      "delete": "Delete card"
+      "title": "支払いカード",
+      "empty": "カードはまだ追加されていません。",
+      "add": "カードを追加",
+      "edit": "カードを編集",
+      "delete": "カードを削除"
     },
     "vendors": {
-      "title": "Vendor catalog",
-      "searchPlaceholder": "Search vendors",
-      "empty": "No vendors recorded.",
-      "add": "Add vendor",
-      "edit": "Edit vendor",
-      "delete": "Delete vendor"
+      "title": "取引先カタログ",
+      "searchPlaceholder": "取引先を検索",
+      "empty": "取引先はまだ登録されていません。",
+      "add": "取引先を追加",
+      "edit": "取引先を編集",
+      "delete": "取引先を削除"
     },
     "invites": {
-      "title": "Team invites",
-      "selectStore": "Select store",
-      "createButton": "Create invite link",
-      "refresh": "Refresh",
-      "empty": "No invites yet.",
-      "copyLink": "Copy link",
-      "openLink": "Open link",
-      "revoke": "Revoke invite",
+      "title": "チーム招待",
+      "selectStore": "店舗を選択",
+      "createButton": "招待リンクを作成",
+      "refresh": "更新",
+      "empty": "まだ招待がありません。",
+      "copyLink": "リンクをコピー",
+      "openLink": "リンクを開く",
+      "revoke": "招待を取り消す",
       "statuses": {
-        "active": "Active",
-        "revoked": "Revoked"
+        "active": "有効",
+        "revoked": "無効"
       }
     }
   },
   "receipts": {
     "detail": {
-      "title": "Receipt detail",
-      "summary": "Summary",
-      "files": "Files",
-      "activity": "Activity"
+      "title": "レシート詳細",
+      "summary": "概要",
+      "files": "ファイル",
+      "activity": "アクティビティ"
     },
     "status": {
-      "draft": "Draft",
-      "pending": "Pending",
-      "confirmed": "Confirmed",
-      "reviewed": "Reviewed",
-      "locked": "Locked"
+      "draft": "下書き",
+      "pending": "保留中",
+      "confirmed": "確認済み",
+      "reviewed": "レビュー済み",
+      "locked": "ロック済み"
+    },
+    "page": {
+      "badge": "レシートワークスペース",
+      "title": "レシート",
+      "description": "アップロードされたレシートを絞り込み、内容を確認します。",
+      "syncBanner": "メンバーシップの変更を同期しています...",
+      "reload": "再読み込み",
+      "chips": {
+        "showing": "{count} 件を表示中",
+        "selected": "{count} 件を選択中",
+        "store": "店舗: {label}",
+        "status": "ステータス: {status}",
+        "range": "期間: {range}",
+        "storeUnselected": "店舗を選択"
+      },
+      "filters": {
+        "store": "店舗",
+        "storePlaceholder": "店舗を選択",
+        "storeLoading": "店舗を読み込み中...",
+        "allStores": "すべての店舗",
+        "status": "ステータス",
+        "statusAll": "すべて",
+        "start": "開始日",
+        "end": "終了日",
+        "rangeDefaultStart": "開始",
+        "rangeDefaultEnd": "今日",
+        "rangeAll": "全期間"
+      },
+      "actions": {
+        "analysisHeading": "分析",
+        "analyze": "選択したレシートを分析",
+        "analyzing": "分析中...",
+        "analysisSelected": "選択済み {count}",
+        "analysisStartedToast": "{count} 件のレシート分析を開始しました。",
+        "analysisStartedStatus": "{count} 件のレシート分析を開始しました。",
+        "analysisSummaryStatus": "{success} 件成功、{failed} 件失敗しました。",
+        "analysisPermissionError": "レシートを分析する権限がありません。",
+        "analysisSelectPrompt": "分析するレシートを選択してください。",
+        "analysisError": "分析を開始できませんでした。",
+        "exportHeading": "エクスポート",
+        "export": "CSV をエクスポート",
+        "exporting": "エクスポート中...",
+        "exportPermissionError": "レシートをエクスポートする権限がありません。",
+        "exportSelectStore": "エクスポート前に店舗を選択してください。",
+        "exportSpecificStore": "特定の店舗を選択してからエクスポートしてください。",
+        "exportSignIn": "レシートをエクスポートするにはサインインが必要です。",
+        "exportGenerating": "CSV を生成中...",
+        "exportPreparing": "ダウンロードを準備中...",
+        "exportComplete": "CSV のエクスポートが完了しました。",
+        "exportError": "CSV のエクスポートに失敗しました。",
+        "exportFailedWithStatus": "CSV のエクスポートに失敗しました（ステータス {status}）。",
+        "confirm": {
+          "filterSeparator": "、",
+          "filter": {
+            "store": "店舗: {store}",
+            "status": "ステータス: {status}",
+            "start": "{date} から",
+            "end": "{date} まで"
+          },
+          "noFilters": "フィルターなし",
+          "allMatching": "一致するレシートすべて",
+          "atLeast": "{count} 件以上",
+          "count": "{count}",
+          "message": "レシートをエクスポートします（{filters}）。\n{count} 件をダウンロードします。続行しますか？"
+        }
+      },
+      "empty": {
+        "loading": "レシートを読み込み中...",
+        "noResults": "レシートが見つかりません。",
+        "selectStore": "レシートを表示する店舗を選択してください。"
+      },
+      "table": {
+        "selectAll": "レシートをすべて選択",
+        "header": {
+          "thumb": "サムネイル",
+          "date": "日付",
+          "vendor": "取引先",
+          "amount": "金額",
+          "tax": "税率 (%)",
+          "status": "ステータス",
+          "uploader": "アップローダー",
+          "purpose": "目的",
+          "payment": "支払い",
+          "advance": "立替"
+        },
+        "noThumb": "サムネイルなし",
+        "altThumbnail": "レシートのサムネイル",
+        "ocrBadge": "OCR",
+        "taxBucket": "税区分"
+      },
+      "advance": {
+        "badge": "立替",
+        "none": "なし"
+      },
+      "guide": {
+        "badge": "クイックガイド",
+        "title": "レシート情報の登録手順",
+        "description": "以下のステップでレシートの内容を確認し、公開してください。",
+        "stepLabel": "STEP {index}",
+        "steps": {
+          "filters": {
+            "title": "フィルターを設定",
+            "hint": "店舗と日付範囲を選択して対象のレシートに絞り込みます。"
+          },
+          "review": {
+            "title": "レシートを開く",
+            "hint": "抽出された金額・取引先・支払い情報を確認し、必要に応じて修正します。"
+          },
+          "confirm": {
+            "title": "編集してステータスを更新",
+            "hint": "必須項目を入力し、ステータスを更新してメンバーと共有します。"
+          }
+        },
+        "toggle": {
+          "show": "クイックガイドを表示",
+          "hide": "クイックガイドを非表示"
+        }
+      }
+    },
+    "detailPage": {
+      "filters": {
+        "status": "ステータス",
+        "statusAll": "すべてのステータス",
+        "uploader": "アップローダー",
+        "startDate": "開始日",
+        "endDate": "終了日",
+        "currentUploader": "表示中のレシート: {uploader}"
+      },
+      "warnings": {
+        "filterMismatch": "表示中のレシートは現在のフィルター範囲外の可能性があります。",
+        "filterStore": "店舗: {store}",
+        "filterStatus": "ステータス: {status}",
+        "filterUploader": "アップローダー ID: {uploader}"
+      },
+      "buttons": {
+        "reset": "リセット",
+        "apply": "適用",
+        "backToList": "一覧に戻る",
+        "previous": "前へ",
+        "next": "次へ",
+        "cancelChanges": "変更をキャンセル",
+        "confirm": "確定",
+        "enhance": "AI で補正"
+      },
+      "preview": {
+        "primary": "レシート"
+      },
+      "amountSource": {
+        "summary": "要約",
+        "summaryEdited": "要約（編集済み）",
+        "summaryAi": "AI 要約",
+        "summaryManual": "手入力",
+        "summaryOcr": "OCR",
+        "ocr": "OCR"
+      },
+      "errors": {
+        "disabled": "レシート機能は無効です。",
+        "notFound": "レシートが見つかりません。",
+        "loadReceipt": "レシートを読み込めませんでした。",
+        "loadPrevious": "前のレシートを読み込めませんでした。",
+        "loadNext": "次のレシートを読み込めませんでした。",
+        "loadPreview": "プレビューを読み込めませんでした。",
+        "loadStore": "店舗情報を読み込めませんでした。",
+        "notLoaded": "レシートがまだ読み込まれていません。",
+        "noPermission": "このレシートを確定する権限がありません。",
+        "confirmFailed": "レシートの確定に失敗しました。"
+      },
+      "toasts": {
+        "noPrevious": "前のレシートはありません。",
+        "noNext": "次のレシートはありません。",
+        "noPendingChanges": "保留中の変更はありません。",
+        "alreadyConfirmed": "レシートは既に確定済みです。",
+        "confirmed": "レシートを確定しました。",
+        "enhanceUnavailable": "このプレビューでは AI 補正を利用できません。"
+      }
+    }
+  },
+  "dashboard": {
+    "nav": {
+      "receipts": "レシート",
+      "passbooks": "通帳",
+      "upload": "アップロード",
+      "settings": "設定",
+      "analytics": "分析"
     }
   }
 }

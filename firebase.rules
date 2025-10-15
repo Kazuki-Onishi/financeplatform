@@ -14,12 +14,18 @@ service cloud.firestore {
 
     function hasStorePermission(storeId) {
       let permsDoc = currentPermissions();
-      return permsDoc != null && permsDoc.data != null && permsDoc.data.storeIds != null && storeId in permsDoc.data.storeIds;
+      return permsDoc != null
+        && permsDoc.data != null
+        && permsDoc.data.storeIds != null
+        && storeId in permsDoc.data.storeIds;
     }
 
     function userHasFlag(flag) {
       let permsDoc = currentPermissions();
-      return permsDoc != null && permsDoc.data != null && permsDoc.data.flags != null && flag in permsDoc.data.flags;
+      return permsDoc != null
+        && permsDoc.data != null
+        && permsDoc.data.flags != null
+        && flag in permsDoc.data.flags;
     }
 
     match /userPermissions/{uid} {
@@ -27,10 +33,9 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /userStoreRoles/{docId} {
-      allow get, list: if isSignedIn()
-        && resource.data.uid == request.auth.uid
-        && (resource.data.isResigned != true);
+    match /userStoreRoles/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow list: if false;
       allow write: if false;
     }
 
@@ -64,13 +69,14 @@ service cloud.firestore {
     match /creditCards/{cardId} {
       function canReadCard() {
         return isSignedIn()
-          && userHasFlag("perm.manageCards")
-          && (resource.data.storeId == null || hasStorePermission(resource.data.storeId));
+          && (
+            userHasFlag("perm.manageCards")
+            || (resource.data.storeId != null && hasStorePermission(resource.data.storeId))
+          );
       }
 
       function canWriteCard() {
-        return isSignedIn()
-          && userHasFlag("perm.manageCards");
+        return isSignedIn() && userHasFlag("perm.manageCards");
       }
 
       allow get, list: if canReadCard();
@@ -93,7 +99,6 @@ service cloud.firestore {
       }
 
       allow get, list: if canManageVendors();
-
       allow create, update, delete: if canManageVendors();
     }
 
@@ -115,7 +120,10 @@ service cloud.firestore {
 
       function hasAssetAccess() {
         let receipt = parentReceipt();
-        return receipt != null && receipt.data != null && receipt.data.storeId != null && hasStorePermission(receipt.data.storeId);
+        return receipt != null
+          && receipt.data != null
+          && receipt.data.storeId != null
+          && hasStorePermission(receipt.data.storeId);
       }
 
       allow get, list: if isSignedIn() && hasAssetAccess();
@@ -124,3 +132,4 @@ service cloud.firestore {
     }
   }
 }
+

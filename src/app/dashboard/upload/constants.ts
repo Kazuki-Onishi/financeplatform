@@ -43,6 +43,17 @@ export const STORE_HISTORY_LIMIT = 5;
 export const SYNC_TIMEOUT_MS = 10_000;
 
 export const PURCHASE_PURPOSE_MAX_LENGTH = 80;
+
+export const PURCHASE_PURPOSE_OPTION_DEFS = [
+  { key: "restock", fallback: "Inventory restock" },
+  { key: "menu_development", fallback: "New menu development" },
+  { key: "event_fair", fallback: "Event or fair preparation" },
+  { key: "consumables", fallback: "Consumables & fixtures restock" },
+  { key: "equipment", fallback: "Equipment upgrades & repairs" },
+  { key: "marketing", fallback: "Advertising & promotion" },
+] as const;
+
+export type PurchasePurposeOptionKey = typeof PURCHASE_PURPOSE_OPTION_DEFS[number]["key"];
 export const RECENT_PAYMENT_METHOD_LOOKBACK = 40;
 
 export const MAX_PAYMENT_METHOD_CHOICES = 6;
@@ -87,3 +98,4 @@ export const STATUS_CLASSES: Record<UploadStatus, string> = {
   error: "text-red-600",
   cancelled: "text-neutral-500",
 };
+

@@ -137,6 +137,25 @@ function extractJsonCandidate(payload: GeminiResponse): string | null {
   return part?.text?.trim() ?? null;
 }
 
+function tryParseGeminiJson(raw: string): GeminiSummarySchema | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return null;
+  }
+  const candidate = trimmed.slice(firstBrace, lastBrace + 1);
+  try {
+    return JSON.parse(candidate) as GeminiSummarySchema;
+  } catch (error) {
+    console.warn('Gemini summarize JSON parse failed', { candidate, error });
+    return null;
+  }
+}
+
 function normaliseKeywords(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -216,21 +235,18 @@ async function callGeminiSummary(text: string, language: string): Promise<Gemini
       throw new Error("Gemini summarize response missing content");
     }
 
-    let parsed: GeminiSummarySchema;
-    try {
-      parsed = JSON.parse(jsonText) as GeminiSummarySchema;
-    } catch (error) {
-      console.error("Failed to parse Gemini summarize JSON", { jsonText, error });
-      throw new Error("Gemini summarize response was not valid JSON");
+    const parsed = tryParseGeminiJson(jsonText);
+    if (!parsed) {
+      console.warn('Gemini summarize response was not valid JSON', { jsonText });
     }
 
-    const summary = resolveSummaryFields(parsed.summary);
-    const detectedLanguage = normaliseLanguage(parsed.language, language);
+    const summary = resolveSummaryFields(parsed?.summary);
+    const detectedLanguage = normaliseLanguage(parsed?.language, language);
 
     return {
       summary,
       language: detectedLanguage,
-      keywords: normaliseKeywords(parsed.keywords),
+      keywords: normaliseKeywords(parsed?.keywords),
       usage: {
         promptTokens: payload.usageMetadata?.promptTokenCount ?? null,
         candidatesTokens: payload.usageMetadata?.candidatesTokenCount ?? null,

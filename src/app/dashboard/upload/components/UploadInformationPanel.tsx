@@ -13,7 +13,9 @@ import type { ReceiptSourceType } from "@/types/receipt";
 
 import {
   PURCHASE_PURPOSE_MAX_LENGTH,
+  PURCHASE_PURPOSE_OPTION_DEFS,
   SOURCE_TYPE_DEFINITIONS,
+  type PurchasePurposeOptionKey,
 } from "../constants";
 import type { PaymentMethodChoice } from "../types";
 
@@ -51,6 +53,8 @@ interface UploadInformationPanelProps {
   onChangePurposeNote: (value: string) => void;
   purposeQuickOptions: ReceiptPurposeOption[];
   showPurposeNoteInput: boolean;
+  purchasePurposeKey: PurchasePurposeOptionKey | "custom" | "none";
+  onChangePurchasePurposeKey: (key: PurchasePurposeOptionKey | "custom" | "none") => void;
   purchasePurpose: string;
   onChangePurchasePurpose: (value: string) => void;
   onPurchasePurposeBlur: () => void;
@@ -86,6 +90,8 @@ export function UploadInformationPanel({
   onChangePurposeNote,
   purposeQuickOptions,
   showPurposeNoteInput,
+  purchasePurposeKey,
+  onChangePurchasePurposeKey,
   purchasePurpose,
   onChangePurchasePurpose,
   onPurchasePurposeBlur,
@@ -95,6 +101,17 @@ export function UploadInformationPanel({
 }: UploadInformationPanelProps) {
   const t = useTranslations();
   const tInfo = useTranslations("upload.information");
+  const tPurchasePurposeOptions = useTranslations("upload.information.purchaseOptions");
+
+  const getPurchasePurposeLabel = (key: PurchasePurposeOptionKey) => {
+    const value = tPurchasePurposeOptions(key);
+    if (value === key) {
+      const fallback = PURCHASE_PURPOSE_OPTION_DEFS.find((option) => option.key === key)?.fallback ?? key;
+      return fallback;
+    }
+    return value;
+  };
+
 
   return (
     <section className="surface-card surface-card--interactive flex flex-col gap-6 p-4 sm:p-6">
@@ -359,37 +376,58 @@ export function UploadInformationPanel({
             />
           ) : null}
         </div>
-
         <div className="flex flex-col gap-1 xl:col-span-3">
-          <label className="text-sm font-medium text-neutral-600" htmlFor="receipt-purchase-purpose">
+          <label className="text-sm font-medium text-neutral-600" htmlFor="receipt-purchase-purpose-select">
             {tInfo("purchaseLabel")}
           </label>
-          <input
-            id="receipt-purchase-purpose"
-            type="text"
-            value={purchasePurpose}
-            onChange={(event) =>
-              onChangePurchasePurpose(event.target.value.slice(0, PURCHASE_PURPOSE_MAX_LENGTH))
-            }
-            onBlur={onPurchasePurposeBlur}
-            maxLength={PURCHASE_PURPOSE_MAX_LENGTH}
+          <select
+            id="receipt-purchase-purpose-select"
             className="rounded-lg border border-neutral-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
-            placeholder={tInfo("purchasePlaceholder")}
-          />
-          {purchaseQuickValues.length ? (
-            <div className="flex flex-wrap justify-center gap-2 text-xs text-neutral-500 sm:justify-start">
-              <span className="font-medium text-neutral-500">{tInfo("purchaseRecent")}</span>
-              {purchaseQuickValues.map((value) => (
-                <button
-                  key={`purchase-${value}`}
-                  type="button"
-                  onClick={() => onPurchaseQuickSelect(value)}
-                  className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-neutral-600 hover:border-neutral-400"
-                >
-                  {value}
-                </button>
-              ))}
-            </div>
+            value={purchasePurposeKey}
+            onChange={(event) =>
+              onChangePurchasePurposeKey(
+                event.target.value as PurchasePurposeOptionKey | "custom" | "none",
+              )
+            }
+          >
+            <option value="none">{tInfo("purchaseSelectPlaceholder")}</option>
+            {PURCHASE_PURPOSE_OPTION_DEFS.map((option) => (
+              <option key={option.key} value={option.key}>
+                {getPurchasePurposeLabel(option.key)}
+              </option>
+            ))}
+            <option value="custom">{tInfo("purchaseOptionCustom")}</option>
+          </select>
+          {purchasePurposeKey === "custom" ? (
+            <>
+              <input
+                id="receipt-purchase-purpose-custom"
+                type="text"
+                value={purchasePurpose}
+                onChange={(event) =>
+                  onChangePurchasePurpose(event.target.value.slice(0, PURCHASE_PURPOSE_MAX_LENGTH))
+                }
+                onBlur={onPurchasePurposeBlur}
+                maxLength={PURCHASE_PURPOSE_MAX_LENGTH}
+                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-100"
+                placeholder={tInfo("purchasePlaceholder")}
+              />
+              {purchaseQuickValues.length ? (
+                <div className="flex flex-wrap justify-center gap-2 text-xs text-neutral-500 sm:justify-start">
+                  <span className="font-medium text-neutral-500">{tInfo("purchaseRecent")}</span>
+                  {purchaseQuickValues.map((value) => (
+                    <button
+                      key={`purchase-${value}`}
+                      type="button"
+                      onClick={() => onPurchaseQuickSelect(value)}
+                      className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-neutral-600 hover:border-neutral-400"
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>

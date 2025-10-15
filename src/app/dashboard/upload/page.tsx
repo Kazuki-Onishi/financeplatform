@@ -307,6 +307,8 @@ export default function UploadPage() {
           onChangePurposeNote={form.setPurposeNote}
           purposeQuickOptions={form.purposeQuickOptions}
           showPurposeNoteInput={showPurposeNoteInput}
+          purchasePurposeKey={form.purchasePurposeKey}
+          onChangePurchasePurposeKey={form.setPurchasePurposeKey}
           purchasePurpose={form.purchasePurpose}
           onChangePurchasePurpose={form.setPurchasePurpose}
           onPurchasePurposeBlur={form.handlePurchasePurposeBlur}

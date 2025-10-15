@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { serverTimestamp, updateDoc } from "firebase/firestore";
 import { callOCR, callSummarize } from "@/lib/api.client";
+import { cleanAmount, toIsoDate } from "@/lib/ocrPassbook";
+import { toHalfWidth } from "@/lib/text/width";
 import { receiptDoc } from "@/lib/firestoreRefs";
 import { PURPOSE_NOTE_MAX_LENGTH, PURPOSE_OPTIONS, findPurposeOption } from "@/lib/purposeOptions";
 import type { ReceiptOcrData, ReceiptPassbookEntry, ReceiptRecord, ReceiptSummaryData, ReceiptSummaryLineItem } from "@/types/receipt";
@@ -52,6 +54,15 @@ type SummaryMetaState = {
   modelVersion: string | null;
 };
 
+type PassbookEntryDraft = {
+  id: string;
+  rawDate: string;
+  description: string;
+  withdrawal: string;
+  deposit: string;
+  balance: string;
+};
+
 interface SummaryPanelProps {
   receipt: ReceiptRecord;
   canEdit: boolean;
@@ -61,6 +72,7 @@ interface SummaryPanelProps {
   maxLineItems?: number;
   onConfirm?: () => void;
   confirmDisabled?: boolean;
+  summariesEnabled?: boolean;
 }
 
 const DEFAULT_FORM: SummaryFormState = {
@@ -123,6 +135,13 @@ function generateLineItemId(): string {
   return `line-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function generatePassbookEntryDraftId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `passbook-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function formatPassbookNumber(value: number | null): string {
   if (value === null || Number.isNaN(value)) {
     return "";
@@ -145,6 +164,31 @@ function formatPassbookDate(entry: ReceiptPassbookEntry): string {
     return entry.date;
   }
   return "";
+}
+
+function createEmptyPassbookDraft(): PassbookEntryDraft {
+  return {
+    id: generatePassbookEntryDraftId(),
+    rawDate: "",
+    description: "",
+    withdrawal: "",
+    deposit: "",
+    balance: "",
+  };
+}
+
+function buildPassbookDraft(entries: ReceiptPassbookEntry[]): PassbookEntryDraft[] {
+  if (!entries.length) {
+    return [];
+  }
+  return entries.map((entry) => ({
+    id: generatePassbookEntryDraftId(),
+    rawDate: formatPassbookDate(entry),
+    description: entry.description ?? "",
+    withdrawal: entry.withdrawal != null ? String(entry.withdrawal) : "",
+    deposit: entry.deposit != null ? String(entry.deposit) : "",
+    balance: entry.balance != null ? String(entry.balance) : "",
+  }));
 }
 
 function normaliseTaxRate(
@@ -178,7 +222,7 @@ function normaliseTaxRate(
   return null;
 }
 
-export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpdate, previews = [], maxLineItems = MAX_LINE_ITEMS, onConfirm, confirmDisabled }: SummaryPanelProps) {
+export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpdate, previews = [], maxLineItems = MAX_LINE_ITEMS, onConfirm, confirmDisabled, summariesEnabled = true }: SummaryPanelProps) {
   const [summaryForm, setSummaryForm] = useState<SummaryFormState>(DEFAULT_FORM);
   const [summaryMeta, setSummaryMeta] = useState<SummaryMetaState>(DEFAULT_META);
   const [summaryDirty, setSummaryDirty] = useState(false);
@@ -223,6 +267,136 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
   }, [receipt.ocr?.passbookEntries]);
   const hasPassbookEntries = passbookEntries.length > 0;
 
+
+  const [editingPassbook, setEditingPassbook] = useState(false);
+  const [passbookDraft, setPassbookDraft] = useState<PassbookEntryDraft[]>(() =>
+    passbookEntries.length ? buildPassbookDraft(passbookEntries) : [],
+  );
+  const [passbookDirty, setPassbookDirty] = useState(false);
+  const [passbookSaving, setPassbookSaving] = useState(false);
+  const [passbookEditError, setPassbookEditError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editingPassbook) {
+      setPassbookDraft(passbookEntries.length ? buildPassbookDraft(passbookEntries) : []);
+      setPassbookDirty(false);
+      setPassbookEditError(null);
+    }
+  }, [editingPassbook, passbookEntries]);
+
+  const handleStartPassbookEdit = useCallback(() => {
+    setPassbookDraft(passbookEntries.length ? buildPassbookDraft(passbookEntries) : [createEmptyPassbookDraft()]);
+    setPassbookDirty(false);
+    setPassbookEditError(null);
+    setEditingPassbook(true);
+  }, [passbookEntries]);
+
+  const handleCancelPassbookEdit = useCallback(() => {
+    setEditingPassbook(false);
+    setPassbookDraft(passbookEntries.length ? buildPassbookDraft(passbookEntries) : []);
+    setPassbookDirty(false);
+    setPassbookEditError(null);
+  }, [passbookEntries]);
+
+  const handleAddPassbookRow = useCallback(() => {
+    setPassbookDraft((prev) => [...prev, createEmptyPassbookDraft()]);
+    setPassbookDirty(true);
+  }, []);
+
+  const handleRemovePassbookRow = useCallback((id: string) => {
+    setPassbookDraft((prev) => prev.filter((row) => row.id !== id));
+    setPassbookDirty(true);
+  }, []);
+
+  const handlePassbookDraftChange = useCallback(
+    (id: string, field: keyof PassbookEntryDraft, value: string) => {
+      setPassbookDraft((prev) =>
+        prev.map((row) =>
+          row.id === id
+            ? {
+                ...row,
+                [field]: field === "description" ? value : toHalfWidth(value),
+              }
+            : row,
+        ),
+      );
+      setPassbookDirty(true);
+    },
+    [],
+  );
+
+  const handleSavePassbookEntries = useCallback(async () => {
+    if (!canEdit) {
+      pushToast("error", "You do not have permission to edit passbook entries.");
+      return;
+    }
+    setPassbookSaving(true);
+    setPassbookEditError(null);
+    try {
+      const parseAmountValue = (input: string): number | null => {
+        const normalised = toHalfWidth(input);
+        if (!normalised.trim().length) {
+          return null;
+        }
+        return cleanAmount(normalised);
+      };
+
+      const nextEntries = passbookDraft
+        .map((row) => {
+          const rawDate = toHalfWidth(row.rawDate).replace(/\s+/g, "");
+          const description = row.description.trim() ? row.description.trim() : null;
+          const withdrawal = parseAmountValue(row.withdrawal);
+          const deposit = parseAmountValue(row.deposit);
+          const balance = parseAmountValue(row.balance);
+          if (!rawDate && !description && withdrawal === null && deposit === null && balance === null) {
+            return null;
+          }
+          return {
+            rawDate: rawDate || null,
+            date: rawDate ? toIsoDate(rawDate) : null,
+            description,
+            withdrawal,
+            deposit,
+            balance,
+          } as ReceiptPassbookEntry;
+        })
+        .filter((entry): entry is ReceiptPassbookEntry => entry !== null);
+
+      await updateDoc(receiptDoc(receipt.id), {
+        "ocr.passbookEntries": nextEntries,
+        updatedAt: serverTimestamp(),
+        "meta.manualEdits": true,
+      });
+
+      onReceiptUpdate((prev) =>
+        prev
+          ? {
+              ...prev,
+              ocr: {
+                ...prev.ocr,
+                passbookEntries: nextEntries,
+              },
+              meta: {
+                ...prev.meta,
+                manualEdits: true,
+              },
+            }
+          : prev,
+      );
+
+      setPassbookDraft(nextEntries.length ? buildPassbookDraft(nextEntries) : []);
+      setPassbookDirty(false);
+      setEditingPassbook(false);
+      pushToast("success", "Passbook entries updated.");
+    } catch (err) {
+      console.error("Failed to save passbook entries", err);
+      const message = err instanceof Error ? err.message : "Failed to save passbook entries.";
+      setPassbookEditError(message);
+      pushToast("error", message);
+    } finally {
+      setPassbookSaving(false);
+    }
+  }, [canEdit, onReceiptUpdate, passbookDraft, pushToast, receipt.id]);
 
   useEffect(() => {
     const nextSummary = receipt.summary ?? null;
@@ -483,6 +657,13 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
         onReceiptUpdate((prev) => (prev ? { ...prev, ocr: nextOcr } : prev));
       }
 
+      if (!summariesEnabled) {
+        setSummaryMeta(DEFAULT_META);
+        setSummaryDirty(false);
+        pushToast("success", "OCR refreshed.");
+        return;
+      }
+
       const summaryResult = await callSummarize(text);
       setSummaryForm((prev) => {
         const resultAmount =
@@ -528,7 +709,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     } finally {
       setLoading(false);
     }
-  }, [canEdit, onReceiptUpdate, pushToast, receipt]);
+  }, [canEdit, onReceiptUpdate, pushToast, receipt, summariesEnabled]);
 
   const handleSave = useCallback(async () => {
     if (!canEdit) {
@@ -672,11 +853,14 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     }
   }, [canEdit, keywords, latestOcr, onReceiptUpdate, ocrPreview, pushToast, receipt, summaryDirty, summaryForm, summaryMeta]);
 
-  const disableRun = !canEdit || loading || saving;
+  const disableRun = !canEdit || loading || saving || passbookSaving || editingPassbook;
   const disableSave = !canEdit || saving;
 
   if (isPassbook) {
     const rawText = receipt.ocr?.rawText ?? "";
+    const confirmDisabledState = (confirmDisabled ?? false) || editingPassbook || passbookSaving;
+    const hasDraftRows = passbookDraft.length > 0;
+
     return (
       <section className="flex flex-col gap-4 rounded border border-neutral-200 p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -684,7 +868,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             <h2 className="text-lg font-semibold">Passbook OCR</h2>
             <p className="text-sm text-neutral-500">Vision OCR result for bankbook entries.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleRun}
@@ -693,11 +877,40 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             >
               {loading ? "Processing..." : "Run OCR"}
             </button>
+            {editingPassbook ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSavePassbookEntries}
+                  disabled={!passbookDirty || passbookSaving}
+                  className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {passbookSaving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelPassbookEdit}
+                  disabled={passbookSaving}
+                  className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartPassbookEdit}
+                disabled={!canEdit || passbookSaving}
+                className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Edit entries
+              </button>
+            )}
             {onConfirm ? (
               <button
                 type="button"
                 onClick={onConfirm}
-                disabled={confirmDisabled}
+                disabled={confirmDisabledState}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Confirm
@@ -707,51 +920,225 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
         </div>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {passbookEditError ? <p className="text-sm text-red-600">{passbookEditError}</p> : null}
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full border border-neutral-200 text-sm">
-            <thead className="bg-neutral-50 text-neutral-600">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">日付</th>
-                <th className="px-3 py-2 text-left font-medium">摘要</th>
-                <th className="px-3 py-2 text-right font-medium">お支払金額</th>
-                <th className="px-3 py-2 text-right font-medium">お預り金額</th>
-                <th className="px-3 py-2 text-right font-medium">差引残高</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hasPassbookEntries ? (
-                passbookEntries.map((entry, index) => (
-                  <tr key={`${index}-${entry.rawDate ?? entry.date ?? index}`} className="border-t border-neutral-200">
-                    <td className="px-3 py-2 text-sm text-neutral-700">{formatPassbookDate(entry) || "-"}</td>
-                    <td className="px-3 py-2 text-sm text-neutral-700">{entry.description ?? ""}</td>
-                    <td className="px-3 py-2 text-right font-mono text-sm text-neutral-700 tabular-nums">
-                      {formatPassbookNumber(entry.withdrawal)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono text-sm text-neutral-700 tabular-nums">
-                      {formatPassbookNumber(entry.deposit)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono text-sm text-neutral-800 tabular-nums">
-                      {formatPassbookNumber(entry.balance)}
-                    </td>
+        <div className="flex flex-col gap-6">
+          <div className="space-y-3">
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-neutral-200 text-sm">
+                <thead className="bg-neutral-50 text-neutral-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">日付</th>
+                    <th className="px-3 py-2 text-left font-medium">摘要</th>
+                    <th className="px-3 py-2 text-right font-medium">お支払金額</th>
+                    <th className="px-3 py-2 text-right font-medium">お預り金額</th>
+                    <th className="px-3 py-2 text-right font-medium">差引残高</th>
                   </tr>
-                ))
-              ) : (
-                <tr className="border-t border-neutral-200">
-                  <td className="px-3 py-4 text-center text-sm text-neutral-500" colSpan={5}>
-                    OCR で通帳明細を検出できませんでした。
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {editingPassbook ? (
+                    hasDraftRows ? (
+                      passbookDraft.map((row) => (
+                        <tr key={row.id} className="border-t border-neutral-200">
+                          <td className="px-3 py-2 align-top">
+                            <input
+                              value={row.rawDate}
+                              onChange={(event) => handlePassbookDraftChange(row.id, "rawDate", event.target.value)}
+                              placeholder="24.04.10"
+                              inputMode="numeric"
+                              className="w-full rounded border border-neutral-300 px-2 py-1 text-sm"
+                            />
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            <div className="flex items-start gap-2">
+                              <input
+                                value={row.description}
+                                onChange={(event) => handlePassbookDraftChange(row.id, "description", event.target.value)}
+                                placeholder="摘要"
+                                className="w-full rounded border border-neutral-300 px-2 py-1 text-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePassbookRow(row.id)}
+                                className="rounded border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
+                              >
+                                削除
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            <input
+                              value={row.withdrawal}
+                              onChange={(event) => handlePassbookDraftChange(row.id, "withdrawal", event.target.value)}
+                              placeholder="0"
+                              inputMode="decimal"
+                              className="w-full rounded border border-neutral-300 px-2 py-1 text-right text-sm font-mono"
+                            />
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            <input
+                              value={row.deposit}
+                              onChange={(event) => handlePassbookDraftChange(row.id, "deposit", event.target.value)}
+                              placeholder="0"
+                              inputMode="decimal"
+                              className="w-full rounded border border-neutral-300 px-2 py-1 text-right text-sm font-mono"
+                            />
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            <input
+                              value={row.balance}
+                              onChange={(event) => handlePassbookDraftChange(row.id, "balance", event.target.value)}
+                              placeholder="0"
+                              inputMode="decimal"
+                              className="w-full rounded border border-neutral-300 px-2 py-1 text-right text-sm font-mono"
+                            />
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-neutral-200">
+                        <td className="px-3 py-3 text-center text-sm text-neutral-500" colSpan={5}>
+                          行がありません。「行を追加」を押して明細を追加してください。
+                        </td>
+                      </tr>
+                    )
+                  ) : hasPassbookEntries ? (
+                    passbookEntries.map((entry, index) => {
+                      const description = entry.description?.trim().length ? entry.description : "（摘要なし）";
+                      const positionLabel =
+                        passbookEntries.length > 1 ? `明細 ${index + 1}/${passbookEntries.length}` : null;
+                      return (
+                        <tr key={`${index}-${entry.rawDate ?? entry.date ?? index}`} className="border-t border-neutral-200">
+                          <td className="px-3 py-2 text-sm text-neutral-700">{formatPassbookDate(entry) || "-"}</td>
+                          <td className="px-3 py-2 text-sm text-neutral-700">
+                            <div className="space-y-1">
+                              <div>{description}</div>
+                              {positionLabel ? (
+                                <div className="text-[11px] text-neutral-400">{positionLabel}</div>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-sm text-neutral-700 tabular-nums">
+                            {formatPassbookNumber(entry.withdrawal)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-sm text-neutral-700 tabular-nums">
+                            {formatPassbookNumber(entry.deposit)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-sm text-neutral-800 tabular-nums">
+                            {formatPassbookNumber(entry.balance)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr className="border-t border-neutral-200">
+                      <td className="px-3 py-4 text-center text-sm text-neutral-500" colSpan={5}>
+                        Vision OCR で通帳明細を検出できませんでした。
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {editingPassbook ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
+                <button
+                  type="button"
+                  onClick={handleAddPassbookRow}
+                  className="rounded border border-neutral-300 px-3 py-1 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed"
+                >
+                  行を追加
+                </button>
+                <span>保存時に日付と金額は半角に正規化されます。</span>
+              </div>
+            ) : null}
+          </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-neutral-700">OCR テキスト</h3>
-          <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
-            {rawText || "(テキストなし)"}
-          </pre>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setActivePreviewTab("image")}
+                disabled={!hasImagePreviews}
+                className={`rounded px-3 py-1 ${
+                  activePreviewTab === "image"
+                    ? "bg-blue-600 text-white"
+                    : "bg-neutral-200 text-neutral-700"
+                } ${!hasImagePreviews ? "cursor-not-allowed opacity-60" : "hover:bg-blue-700 hover:text-white"}`}
+              >
+                通帳画像
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePreviewTab("ocr")}
+                className={`rounded px-3 py-1 ${
+                  activePreviewTab === "ocr"
+                    ? "bg-blue-600 text-white"
+                    : "bg-neutral-200 text-neutral-700 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                OCRテキスト
+              </button>
+            </div>
+            {activePreviewTab === "image" ? (
+              hasImagePreviews && activePreview ? (
+                <div className="flex flex-col gap-3">
+                  <div
+                    className="relative w-full overflow-hidden rounded border border-neutral-200 bg-neutral-100"
+                    style={{ aspectRatio: "3 / 4" }}
+                  >
+                    <Image
+                      src={activePreview.url}
+                      alt={`Passbook preview ${activePreview.label}`}
+                      fill
+                      sizes="(min-width: 1024px) 420px, 100vw"
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </div>
+                  {previews.length > 1 ? (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {previews.map((preview) => {
+                        const isActive = activePreview?.id === preview.id;
+                        return (
+                          <button
+                            key={preview.id}
+                            type="button"
+                            onClick={() => setSelectedPreviewId(preview.id)}
+                            className={`flex min-w-[5.5rem] flex-col items-center gap-1 rounded border px-2 py-2 text-[11px] ${
+                              isActive
+                                ? "border-blue-500 bg-blue-50 text-blue-700"
+                                : "border-neutral-200 bg-white text-neutral-600 hover:border-blue-300"
+                            }`}
+                          >
+                            <span className="block h-16 w-20 overflow-hidden rounded bg-neutral-100">
+                              <Image
+                                src={preview.thumbnailUrl ?? preview.url}
+                                alt={`Preview ${preview.label}`}
+                                width={80}
+                                height={64}
+                                className="h-full w-full object-cover"
+                                unoptimized
+                              />
+                            </span>
+                            <span className="truncate">{preview.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="rounded border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
+                  通帳画像がありません。
+                </p>
+              )
+            ) : (
+              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
+                {rawText || "（OCRテキストがありません）"}
+              </pre>
+            )}
+          </div>
         </div>
       </section>
     );
@@ -912,7 +1299,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               value={summaryForm.vendor ?? ""}
               onChange={(event) => handleSummaryFieldChange("vendor", event.target.value ? event.target.value : null)}
               className="rounded border border-neutral-300 px-3 py-2"
-              placeholder="���[�\��"
+              placeholder="・ｽ・ｽ・ｽ[・ｽ\・ｽ・ｽ"
               disabled={!canEdit}
             />
           </label>
@@ -997,7 +1384,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               onChange={(event) => handleSummaryFieldChange("memo", event.target.value ? event.target.value : null)}
               rows={4}
               className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
-              placeholder="�������̃���"
+              placeholder="・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽﾌ・ｿｽ・ｽ・ｽ"
               disabled={!canEdit}
             />
           </label>

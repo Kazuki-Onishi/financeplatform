@@ -492,7 +492,9 @@ export default function ReceiptsPage() {
           }),
         );
 
-        const sorted = mapped
+        const filtered = mapped.filter((record) => record.sourceType === "receipt");
+
+        const sorted = filtered
           .sort((a, b) => {
             const aMillis = a.createdAt?.toMillis?.() ?? 0;
             const bMillis = b.createdAt?.toMillis?.() ?? 0;

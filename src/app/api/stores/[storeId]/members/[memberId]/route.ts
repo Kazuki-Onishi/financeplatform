@@ -1,8 +1,9 @@
-export const runtime = "nodejs";
+﻿export const runtime = "nodejs";
 
 import { NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "../../../../../../lib/firebase/admin";
+import { upsertUserStoreRoleFromMember } from "../../../../../../lib/userStoreRoles";
 import { jsonResponse } from "../../../../../../lib/http";
 import { coercePermissionFlags, normalizeStoreMemberRole } from "../../../../../../lib/permissions";
 import type { PermissionFlag } from "../../../../../../types/permissions";
@@ -157,3 +158,4 @@ export async function PATCH(
     return jsonResponse({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+

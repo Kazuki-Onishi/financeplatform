@@ -1,9 +1,14 @@
 ﻿export const runtime = "nodejs";
 
 import { NextRequest } from "next/server";
-import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "../../../../../lib/firebase/admin";
 import { jsonResponse } from "../../../../../lib/http";
+import { fetchUserProfiles } from "../../../../../lib/userProfiles";
+import {
+  mapStoreMemberToAggregate,
+  upsertUserStoreRoleFromMember,
+  type AggregatedStoreMembership,
+} from "../../../../../lib/userStoreRoles";
 import type { StoreMemberDoc } from "../../../../../types/store";
 import type { PermissionFlag } from "../../../../../types/permissions";
 
@@ -56,35 +61,69 @@ export async function GET(
       return jsonResponse({ error: "Forbidden" }, { status: 403 });
     }
 
-    const membersSnap = await storeRef.collection("members").orderBy("joinedAt", "asc").get();
-    const members = await Promise.all(
-      membersSnap.docs.map(async (doc) => {
-        const data = doc.data() as StoreMemberDoc & { isResigned?: boolean };
-        let displayName: string | null = null;
-        let email: string | null = null;
-        let photoURL: string | null = null;
-        try {
-          const userRecord = await adminAuth.getUser(doc.id);
-          displayName = userRecord.displayName ?? null;
-          email = userRecord.email ?? null;
-          photoURL = userRecord.photoURL ?? null;
-        } catch (error) {
-          console.warn("[members] failed to load user profile", doc.id, error);
+    const rolesQuery = await adminDb
+      .collection("userStoreRoles")
+      .where("storeIds", "array-contains", storeId)
+      .get();
+
+    const memberEntries: Array<{ id: string; entry: AggregatedStoreMembership }> = [];
+
+    if (!rolesQuery.empty) {
+      rolesQuery.forEach((doc) => {
+        const data = doc.data() as { stores?: AggregatedStoreMembership[] };
+        const entry = Array.isArray(data.stores)
+          ? data.stores.find((value) => value.storeId === storeId)
+          : undefined;
+        if (entry) {
+          memberEntries.push({ id: doc.id, entry });
         }
-        return {
-          id: doc.id,
-          role: data.role,
-          flags: data.flags ?? [],
-          status: data.status,
-          resigned: Boolean(data.isResigned),
-          joinedAt: data.joinedAt instanceof Timestamp ? data.joinedAt.toDate().toISOString() : null,
-          invitedBy: data.invitedBy ?? null,
-          displayName,
-          email,
-          photoURL,
-        };
-      }),
+      });
+    }
+
+    if (!memberEntries.length) {
+      const fallbackSnap = await storeRef.collection("members").orderBy("joinedAt", "asc").get();
+      const fallbackDocs = fallbackSnap.docs.map((doc) => ({
+        id: doc.id,
+        data: doc.data() as StoreMemberDoc & { isResigned?: boolean },
+      }));
+
+      await Promise.all(
+        fallbackDocs.map(({ id, data }) => upsertUserStoreRoleFromMember(id, storeId, data)),
+      );
+
+      fallbackDocs.forEach(({ id, data }) => {
+        memberEntries.push({ id, entry: mapStoreMemberToAggregate(storeId, data) });
+      });
+    }
+
+    if (!memberEntries.length) {
+      return jsonResponse({ members: [], canManageMembers: hasManagePermission(memberData) });
+    }
+
+    const profileMap = await fetchUserProfiles(
+      memberEntries.map((entry) => entry.id),
+      {
+        onBatchError: (uids, error) => {
+          console.warn("[members] failed to load user profiles batch", { batchSize: uids.length }, error);
+        },
+      },
     );
+
+    const members = memberEntries.map(({ id, entry }) => {
+      const profile = profileMap.get(id);
+      return {
+        id,
+        role: entry.role,
+        flags: Array.isArray(entry.flags) ? entry.flags : [],
+        status: entry.status,
+        resigned: Boolean(entry.resigned),
+        joinedAt: entry.joinedAt ?? null,
+        invitedBy: entry.invitedBy ?? null,
+        displayName: profile?.displayName ?? null,
+        email: profile?.email ?? null,
+        photoURL: profile?.photoURL ?? null,
+      };
+    });
 
     return jsonResponse({ members, canManageMembers: hasManagePermission(memberData) });
   } catch (error) {

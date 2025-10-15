@@ -23,12 +23,14 @@ import {
   MAX_PAYMENT_METHOD_CHOICES,
   PURCHASE_HISTORY_STORAGE_KEY,
   PURCHASE_PURPOSE_MAX_LENGTH,
+  PURCHASE_PURPOSE_OPTION_DEFS,
   PURPOSE_HISTORY_STORAGE_KEY,
   RECENT_PAYMENT_METHOD_LOOKBACK,
   STORE_HISTORY_LIMIT,
   STORE_HISTORY_STORAGE_KEY,
   SYNC_TIMEOUT_MS,
   CREDIT_CARD_FETCH_LIMIT,
+  type PurchasePurposeOptionKey,
 } from "../constants";
 import {
   createPaymentMethodKey,
@@ -84,6 +86,8 @@ interface UseUploadFormResult {
   setPurposeKey: (key: string) => void;
   purposeNote: string;
   setPurposeNote: (note: string) => void;
+  purchasePurposeKey: PurchasePurposeOptionKey | "custom" | "none";
+  setPurchasePurposeKey: (key: PurchasePurposeOptionKey | "custom" | "none") => void;
   purchasePurpose: string;
   setPurchasePurpose: (value: string) => void;
   purposeQuickOptions: ReceiptPurposeOption[];
@@ -131,9 +135,36 @@ export function useUploadForm({
   const [advancePayment, setAdvancePayment] = useState<boolean>(false);
   const [purposeKey, setPurposeKey] = useState<string>("");
   const [purposeNote, setPurposeNote] = useState<string>("");
-  const [purchasePurpose, setPurchasePurpose] = useState<string>("");
+  const [purchasePurposeKey, setPurchasePurposeKeyState] = useState<PurchasePurposeOptionKey | "custom" | "none">("none");
+  const [purchasePurpose, setPurchasePurposeState] = useState<string>("");
   const [purposeHistory, setPurposeHistory] = useState<string[]>([]);
   const [purchaseHistory, setPurchaseHistory] = useState<string[]>([]);
+  const setPurchasePurpose = useCallback((value: string) => {
+    const sanitized = value.slice(0, PURCHASE_PURPOSE_MAX_LENGTH);
+    setPurchasePurposeState(sanitized);
+    setPurchasePurposeKeyState((prev) => {
+      if (sanitized.length === 0) {
+        return prev === "custom" ? "custom" : "none";
+      }
+      return "custom";
+    });
+  }, []);
+
+  const setPurchasePurposeKey = useCallback((key: PurchasePurposeOptionKey | "custom" | "none") => {
+    setPurchasePurposeKeyState(key);
+    if (key === "custom") {
+      setPurchasePurposeState("");
+      return;
+    }
+    if (key === "none") {
+      setPurchasePurposeState("");
+      return;
+    }
+    const definition = PURCHASE_PURPOSE_OPTION_DEFS.find((option) => option.key === key);
+    const fallback = definition?.fallback ?? "";
+    setPurchasePurposeState(fallback.slice(0, PURCHASE_PURPOSE_MAX_LENGTH));
+  }, []);
+
   const [recentPaymentMethods, setRecentPaymentMethods] = useState<ReceiptPaymentMethod[]>([]);
   const [availableCards, setAvailableCards] = useState<CreditCardRecord[]>([]);
   const [paymentMethodKey, setPaymentMethodKey] = useState<string>(() =>
@@ -615,12 +646,23 @@ export function useUploadForm({
   }, [purposeKey, purposeNote]);
 
   const getPurchasePurpose = useCallback(() => {
-    const sanitized = purchasePurpose.slice(0, PURCHASE_PURPOSE_MAX_LENGTH);
-    const trimmed = sanitized.trim();
-    return { sanitized, trimmed };
-  }, [purchasePurpose]);
+    if (purchasePurposeKey === "custom") {
+      const sanitized = purchasePurpose.slice(0, PURCHASE_PURPOSE_MAX_LENGTH);
+      const trimmed = sanitized.trim();
+      return { sanitized, trimmed };
+    }
+    if (purchasePurposeKey === "none") {
+      return { sanitized: "", trimmed: "" };
+    }
+    const definition = PURCHASE_PURPOSE_OPTION_DEFS.find((option) => option.key === purchasePurposeKey);
+    const fallback = definition?.fallback ?? "";
+    return { sanitized: fallback, trimmed: fallback };
+  }, [purchasePurpose, purchasePurposeKey]);
 
   const handlePurchasePurposeBlur = useCallback(() => {
+    if (purchasePurposeKey !== "custom") {
+      return;
+    }
     const trimmed = purchasePurpose.trim();
     if (!trimmed) {
       return;
@@ -636,7 +678,7 @@ export function useUploadForm({
       }
       return next;
     });
-  }, [purchasePurpose]);
+  }, [purchasePurpose, purchasePurposeKey]);
 
   const buildEnqueueContext = useCallback((): EnqueueContext => {
     const { option, bucket } = getPurposeContext();
@@ -674,17 +716,17 @@ export function useUploadForm({
 
   const handlePurchaseQuickSelect = useCallback((value: string) => {
     setPurchasePurpose(value);
-  }, []);
+  }, [setPurchasePurpose]);
 
   const resetForm = useCallback(() => {
     setSourceType("receipt");
     setAdvancePayment(false);
     setPurposeKey("");
     setPurposeNote("");
-    setPurchasePurpose("");
+    setPurchasePurposeKey("none");
     const defaultKey = createPaymentMethodKey(DEFAULT_PAYMENT_METHODS[0]);
     setPaymentMethodKey(defaultKey);
-  }, []);
+  }, [setPurchasePurposeKey]);
 
   const storeOptions = useMemo<StoreOption[]>(
     () => knownStoreIds.map((id) => ({ id, name: storeDetails[id]?.name ?? id })),
@@ -743,6 +785,8 @@ export function useUploadForm({
     setPurposeKey,
     purposeNote,
     setPurposeNote,
+    purchasePurposeKey,
+    setPurchasePurposeKey,
     purchasePurpose,
     setPurchasePurpose,
     purposeQuickOptions,
@@ -765,6 +809,3 @@ export function useUploadForm({
     permissionsBusy,
   };
 }
-
-
-

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "@/lib/i18n/I18nProvider";
 import { useParams, useRouter } from "next/navigation";
 import {
   collection,
@@ -85,35 +86,39 @@ function resolveAmountSourceLabel(
   kind: AmountSourceKind | null,
   source: string | null,
   edited: boolean,
+  t: (key: string) => string,
 ): string | null {
   if (!kind) {
     return null;
   }
   if (kind === "summary") {
     if (edited) {
-      return "Summary (edited)";
+      return t("amountSource.summaryEdited");
     }
     if (source) {
       const label = source.trim().toLowerCase();
       if (label === "gemini") {
-        return "AI summary";
+        return t("amountSource.summaryAi");
       }
       if (label === "manual") {
-        return "Manual";
+        return t("amountSource.summaryManual");
       }
       if (label === "ocr" || label === "vision") {
-        return "OCR";
+        return t("amountSource.summaryOcr");
       }
     }
-    return "Summary";
+    return t("amountSource.summary");
   }
-  return "OCR";
+  return t("amountSource.ocr");
 }
 
 
 
 export default function ReceiptDetailPage() {
   const router = useRouter();
+  const tCommon = useTranslations("common");
+  const tDetail = useTranslations("receipts.detailPage");
+  const tStatusLabel = useTranslations("receipts.status");
   const params = useParams<{ id: string }>();
   const receiptId = Array.isArray(params?.id)
     ? params?.id[0]
@@ -146,7 +151,7 @@ export default function ReceiptDetailPage() {
   useEffect(() => {
     if (!RECEIPTS_FLAG) {
       setLoadingReceipt(false);
-      setError("Receipts feature is disabled.");
+      setError(tDetail("errors.disabled"));
       return;
     }
     if (!authReady || permissionsLoading || !receiptId) {
@@ -160,7 +165,7 @@ export default function ReceiptDetailPage() {
         if (!snapshot.exists()) {
           if (!cancelled) {
             setReceipt(null);
-            setError("Receipt not found.");
+            setError(tDetail("errors.notFound"));
           }
           return;
         }
@@ -176,12 +181,12 @@ export default function ReceiptDetailPage() {
         setFilters(createDefaultFilters(record));
         setError(null);
       } catch (fetchError) {
-        console.error("Failed to load receipt", fetchError);
+        console.error(tDetail("errors.loadReceipt"), fetchError);
         if (!cancelled) {
           setError(
             fetchError instanceof Error
               ? fetchError.message
-              : "Failed to load receipt.",
+              : tDetail("errors.loadReceipt"),
           );
           setReceipt(null);
         }
@@ -194,7 +199,7 @@ export default function ReceiptDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [authReady, permissionsLoading, receiptId]);
+  }, [authReady, permissionsLoading, receiptId, tDetail]);
   useEffect(() => {
     if (!storeId) {
       setStoreName("-");
@@ -209,7 +214,7 @@ export default function ReceiptDetailPage() {
           setStoreName(data?.name?.trim() || storeId);
         }
       } catch (storeError) {
-        console.warn("Failed to load store info", storeError);
+        console.warn(tDetail("errors.loadStore"), storeError);
         if (!cancelled) {
           setStoreName(storeId);
         }
@@ -218,7 +223,7 @@ export default function ReceiptDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [storeId]);
+  }, [storeId, tDetail]);
   const previewCandidates = useMemo(() => {
     if (!receipt) {
       return [];
@@ -252,7 +257,7 @@ export default function ReceiptDetailPage() {
           }
           return;
         } catch (downloadError) {
-          console.warn("Failed to load preview", {
+          console.warn(tDetail("errors.loadPreview"), {
             candidate: normalised,
             downloadError,
           });
@@ -265,7 +270,7 @@ export default function ReceiptDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [previewCandidates, receipt]);
+  }, [previewCandidates, receipt, tDetail]);
   useEffect(() => {
     if (!filtersOpen) {
       return;
@@ -307,8 +312,8 @@ export default function ReceiptDetailPage() {
     if (trimmedName) {
       return trimmedName;
     }
-    return receipt?.uploaderId ?? "Unknown";
-  }, [receipt?.uploaderName, receipt?.uploaderId]);
+    return receipt?.uploaderId ?? tCommon("unknown");
+  }, [receipt?.uploaderName, receipt?.uploaderId, tCommon]);
   const summaryPreviews: SummaryPreview[] = useMemo(() => {
     if (!previewUrl) {
       return [];
@@ -317,11 +322,11 @@ export default function ReceiptDetailPage() {
       {
         id: "receipt-primary",
         url: previewUrl,
-        label: "Receipt",
+        label: tDetail("preview.primary"),
         thumbnailUrl: previewUrl,
       },
     ];
-  }, [previewUrl]);
+  }, [previewUrl, tDetail]);
 
   const amountInfo = useMemo<AmountInfo>(() => {
     if (!receipt) {
@@ -382,6 +387,7 @@ export default function ReceiptDetailPage() {
     amountInfo.sourceKind,
     amountInfo.source,
     amountInfo.edited,
+    (key) => tDetail(key),
   );
 
   const filtersAtDefault = useMemo(() => {
@@ -426,7 +432,7 @@ export default function ReceiptDetailPage() {
     const storeId = filters.storeId || receipt.storeId;
     const createdAt = receipt.createdAt;
     if (!storeId || !createdAt) {
-      pushToast("info", "No previous receipt.");
+      pushToast("info", tDetail("toasts.noPrevious"));
       return;
     }
     setNavigatingPrev(true);
@@ -441,17 +447,17 @@ export default function ReceiptDetailPage() {
         ),
       );
       if (snapshot.empty) {
-        pushToast("info", "No previous receipt.");
+        pushToast("info", tDetail("toasts.noPrevious"));
         return;
       }
       router.push(`/dashboard/receipts/${snapshot.docs[0].id}`);
     } catch (navigationError) {
-      console.error("Failed to load previous receipt", navigationError);
-      pushToast("error", "Failed to load previous receipt.");
+      console.error(tDetail("errors.loadPrevious"), navigationError);
+      pushToast("error", tDetail("errors.loadPrevious"));
     } finally {
       setNavigatingPrev(false);
     }
-  }, [filters.storeId, receipt, pushToast, router]);
+  }, [filters.storeId, receipt, pushToast, router, tDetail]);
   const handleGoToNext = useCallback(async () => {
     if (!receipt) {
       return;
@@ -459,7 +465,7 @@ export default function ReceiptDetailPage() {
     const storeId = filters.storeId || receipt.storeId;
     const createdAt = receipt.createdAt;
     if (!storeId || !createdAt) {
-      pushToast("info", "No next receipt.");
+      pushToast("info", tDetail("toasts.noNext"));
       return;
     }
     setNavigatingNext(true);
@@ -474,31 +480,31 @@ export default function ReceiptDetailPage() {
         ),
       );
       if (snapshot.empty) {
-        pushToast("info", "No next receipt.");
+        pushToast("info", tDetail("toasts.noNext"));
         return;
       }
       router.push(`/dashboard/receipts/${snapshot.docs[0].id}`);
     } catch (navigationError) {
-      console.error("Failed to load next receipt", navigationError);
-      pushToast("error", "Failed to load next receipt.");
+      console.error(tDetail("errors.loadNext"), navigationError);
+      pushToast("error", tDetail("errors.loadNext"));
     } finally {
       setNavigatingNext(false);
     }
-  }, [filters.storeId, receipt, pushToast, router]);
+  }, [filters.storeId, receipt, pushToast, router, tDetail]);
   const handleCancelChanges = useCallback(() => {
-    pushToast("info", "No pending local changes.");
-  }, [pushToast]);
+    pushToast("info", tDetail("toasts.noPendingChanges"));
+  }, [pushToast, tDetail]);
   const handleConfirm = useCallback(async () => {
     if (!receipt) {
-      pushToast("error", "Receipt is not loaded yet.");
+      pushToast("error", tDetail("errors.notLoaded"));
       return;
     }
     if (!canEditReceipt) {
-      pushToast("error", "You do not have permission to confirm this receipt.");
+      pushToast("error", tDetail("errors.noPermission"));
       return;
     }
     if (receipt.status === "confirmed") {
-      pushToast("info", "Receipt is already confirmed.");
+      pushToast("info", tDetail("toasts.alreadyConfirmed"));
       return;
     }
     try {
@@ -514,17 +520,17 @@ export default function ReceiptDetailPage() {
             }
           : prev,
       );
-      pushToast("success", "Receipt marked as confirmed.");
+      pushToast("success", tDetail("toasts.confirmed"));
     } catch (confirmError) {
-      console.error("Failed to confirm receipt", confirmError);
+      console.error(tDetail("errors.confirmFailed"), confirmError);
       const message =
-        (confirmError as Error).message ?? "Failed to confirm receipt.";
+        (confirmError as Error).message ?? tDetail("errors.confirmFailed");
       pushToast("error", message);
     }
-  }, [canEditReceipt, pushToast, receipt]);
+  }, [canEditReceipt, pushToast, receipt, tDetail]);
   const handleEnhance = useCallback(() => {
-    pushToast("info", "Enhance action is unavailable in this preview.");
-  }, [pushToast]);
+    pushToast("info", tDetail("toasts.enhanceUnavailable"));
+  }, [pushToast, tDetail]);
   if (!RECEIPTS_FLAG) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 p-6">
@@ -590,7 +596,7 @@ export default function ReceiptDetailPage() {
               Store: {storeName}
               {receipt.storeId ? ` (${receipt.storeId})` : ""}
             </span>
-            <span>Status: {receipt.status}</span>
+            <span>{tDetail("warnings.filterStatus", { status: tStatusLabel(receipt.status) })}</span>
             <span className="flex flex-wrap items-center gap-2">
               Amount: {amountDisplay}
               {amountSourceLabel ? (
@@ -668,7 +674,7 @@ export default function ReceiptDetailPage() {
               </label>{" "}
               <label className="flex flex-col gap-1 text-xs">
                 {" "}
-                <span className="text-neutral-500">Status</span>{" "}
+                <span className="text-neutral-500">{tDetail("filters.status")}</span>{" "}
                 <select
                   value={filters.status}
                   onChange={(event) =>
@@ -680,17 +686,22 @@ export default function ReceiptDetailPage() {
                   className="rounded border border-neutral-300 px-2 py-1 text-sm"
                 >
                   {" "}
-                  {STATUS_FILTER_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {" "}
-                      {option}{" "}
-                    </option>
-                  ))}{" "}
+                  {STATUS_FILTER_OPTIONS.map((option) => {
+                    const label =
+                      option === "all"
+                        ? tDetail("filters.statusAll")
+                        : tStatusLabel(option);
+                    return (
+                      <option key={option} value={option}>
+                        {label}
+                      </option>
+                    );
+                  })}{" "}
                 </select>{" "}
               </label>{" "}
               <label className="flex flex-col gap-1 text-xs sm:col-span-2">
                 {" "}
-                <span className="text-neutral-500">Uploader</span>{" "}
+                <span className="text-neutral-500">{tDetail("filters.uploader")}</span>{" "}
                 <input
                   type="text"
                   value={filters.uploaderId}
@@ -702,18 +713,18 @@ export default function ReceiptDetailPage() {
                   }
                   className="rounded border border-neutral-300 px-2 py-1 text-sm"
                   placeholder={
-                    uploaderDisplay || receipt.uploaderId || "Search"
+                    uploaderDisplay || receipt.uploaderId || tCommon("search")
                   }
                 />{" "}
                 {uploaderDisplay ? (
                   <span className="text-[11px] text-neutral-400">
-                    Current receipt: {uploaderDisplay}
+                    {tDetail("filters.currentUploader", { uploader: uploaderDisplay })}
                   </span>
                 ) : null}{" "}
               </label>{" "}
               <label className="flex flex-col gap-1 text-xs">
                 {" "}
-                <span className="text-neutral-500">Start date</span>{" "}
+                <span className="text-neutral-500">{tDetail("filters.startDate")}</span>{" "}
                 <input
                   type="date"
                   value={filters.startDate}
@@ -728,7 +739,7 @@ export default function ReceiptDetailPage() {
               </label>{" "}
               <label className="flex flex-col gap-1 text-xs">
                 {" "}
-                <span className="text-neutral-500">End date</span>{" "}
+                <span className="text-neutral-500">{tDetail("filters.endDate")}</span>{" "}
                 <input
                   type="date"
                   value={filters.endDate}
@@ -748,12 +759,12 @@ export default function ReceiptDetailPage() {
               <div className="mt-4 space-y-1 rounded border border-amber-100 bg-amber-50 p-2 text-xs text-amber-700">
                 {" "}
                 <p>
-                  Current receipt might fall outside the active filters.
+                  {tDetail("warnings.filterMismatch")}
                 </p>{" "}
-                {filterStoreMismatch ? <p>Store: {receipt.storeId}</p> : null}{" "}
-                {filterStatusMismatch ? <p>Status: {receipt.status}</p> : null}{" "}
+                {filterStoreMismatch ? <p>{tDetail("warnings.filterStore", { store: receipt.storeId })}</p> : null}{" "}
+                {filterStatusMismatch ? <p>{tDetail("warnings.filterStatus", { status: tStatusLabel(receipt.status) })}</p> : null}{" "}
                 {filterUploaderMismatch ? (
-                  <p>Uploader ID: {receipt.uploaderId}</p>
+                  <p>{tDetail("warnings.filterUploader", { uploader: receipt.uploaderId })}</p>
                 ) : null}{" "}
               </div>
             ) : null}{" "}
@@ -766,7 +777,7 @@ export default function ReceiptDetailPage() {
                 className="rounded border border-neutral-300 px-3 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {" "}
-                Reset{" "}
+                {tDetail("buttons.reset")} 
               </button>{" "}
               <button
                 type="button"
@@ -774,7 +785,7 @@ export default function ReceiptDetailPage() {
                 className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
               >
                 {" "}
-                Apply{" "}
+                {tDetail("buttons.apply")} 
               </button>{" "}
             </div>{" "}
           </div>{" "}
@@ -788,6 +799,7 @@ export default function ReceiptDetailPage() {
         previews={summaryPreviews}
         onConfirm={handleConfirm}
         confirmDisabled={!canEditReceipt || isLocked || receipt.status === "confirmed"}
+        summariesEnabled={GEMINI_FLAG}
       />{" "}
       <div className="flex flex-wrap gap-3">
         {" "}
@@ -797,7 +809,7 @@ export default function ReceiptDetailPage() {
           className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
         >
           {" "}
-          Back to list{" "}
+          {tDetail("buttons.backToList")} 
         </button>{" "}
         <button
           type="button"
@@ -806,7 +818,7 @@ export default function ReceiptDetailPage() {
           className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {" "}
-          {navigatingPrev ? "Loading..." : "Previous"}{" "}
+          {navigatingPrev ? tCommon("loading") : tDetail("buttons.previous")} 
         </button>{" "}
         <button
           type="button"
@@ -815,7 +827,7 @@ export default function ReceiptDetailPage() {
           className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {" "}
-          {navigatingNext ? "Loading..." : "Next"}{" "}
+          {navigatingNext ? tCommon("loading") : tDetail("buttons.next")} 
         </button>{" "}
         <button
           type="button"
@@ -823,7 +835,7 @@ export default function ReceiptDetailPage() {
           className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
         >
           {" "}
-          Cancel changes{" "}
+          {tDetail("buttons.cancelChanges")} 
         </button>{" "}
         <button
           type="button"
@@ -834,7 +846,7 @@ export default function ReceiptDetailPage() {
           className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600"
         >
           {" "}
-          Confirm{" "}
+          {tDetail("buttons.confirm")} 
         </button>{" "}
         {GEMINI_FLAG && !isLocked ? (
           <button
@@ -843,7 +855,7 @@ export default function ReceiptDetailPage() {
             className="rounded border border-purple-400 px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-50"
           >
             {" "}
-            Enhance with AI{" "}
+            {tDetail("buttons.enhance")} 
           </button>
         ) : null}{" "}
       </div>{" "}
