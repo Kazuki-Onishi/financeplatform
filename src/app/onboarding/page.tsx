@@ -12,6 +12,7 @@ import {
   upsertMembership,
   usePermissionsStore,
 } from "@/lib/state/userPermissionsStore";
+import { useTranslations } from "@/lib/i18n/I18nProvider";
 
 interface AcceptResponse {
   storeId: string;
@@ -28,6 +29,7 @@ const SYNC_TIMEOUT_MS = 10_000;
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const t = useTranslations("onboarding");
   const { permissions, loading, confirmed, authReady, currentUid, hasPreload } = useUserPermissions();
   const preloadPermissions = useAppSelector((state) => state.permissions);
   const sameUserPreload =
@@ -90,12 +92,12 @@ export default function OnboardingPage() {
 
     const trimmed = code.trim();
     if (!trimmed) {
-      setError("Invite code is required.");
+      setError(t("errors.codeRequired"));
       return;
     }
     const user = auth.currentUser;
     if (!user) {
-      setError("Please sign in to join a store.");
+      setError(t("errors.signInRequired"));
       return;
     }
     setSubmitting(true);
@@ -112,8 +114,8 @@ export default function OnboardingPage() {
 
       const payload = (await response.json().catch(() => null)) as AcceptResponse | { error?: string } | null;
       if (!response.ok || !payload || typeof payload !== "object" || !("storeId" in payload)) {
-        const message = (payload as { error?: string } | null)?.error ?? "Failed to accept invite.";
-        setError(message);
+        const message = (payload as { error?: string } | null)?.error;
+        setError(message ?? t("errors.acceptFailed"));
         return;
       }
 
@@ -140,14 +142,14 @@ export default function OnboardingPage() {
         }),
       );
 
-      setInfo("Invite accepted. Redirecting to upload...");
+      setInfo(t("status.accepted"));
       setSyncStartedAt(Date.now());
       setSyncExceeded(false);
 
       router.replace(`/dashboard/upload?store=${encodeURIComponent(storeId)}&joined=1`);
     } catch (err) {
       console.error("Failed to accept invite", err);
-      setError("Network error while accepting invite.");
+      setError(t("errors.network"));
     } finally {
       setSubmitting(false);
     }
@@ -176,32 +178,30 @@ export default function OnboardingPage() {
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-2xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Join or create a store</h1>
-        <p className="text-sm text-neutral-500">
-          Enter an invite code to join an existing store, or create a new store to get started immediately.
-        </p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-sm text-neutral-500">{t("description")}</p>
       </header>
 
       {!isSignedIn ? (
         <div className="rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-          Please sign in to continue.
+          {t("alerts.signInRequired")}
           <button type="button" onClick={() => router.push("/login")} className="ml-2 underline">
-            Sign in
+            {t("alerts.signInButton")}
           </button>
         </div>
       ) : null}
 
       <section className="rounded border border-neutral-200 p-4">
-        <h2 className="text-lg font-medium">Join an existing store</h2>
-        <p className="mt-1 text-sm text-neutral-500">Enter the invite code you received from a teammate.</p>
+        <h2 className="text-lg font-medium">{t("join.title")}</h2>
+        <p className="mt-1 text-sm text-neutral-500">{t("join.description")}</p>
         <form className="mt-4 flex flex-col gap-3" onSubmit={handleSubmit}>
           <label className="text-sm font-medium" htmlFor="invite-code">
-            Invite code
+            {t("join.codeLabel")}
           </label>
           <input
             id="invite-code"
             className="w-full rounded border border-neutral-300 px-3 py-2 text-sm uppercase"
-            placeholder="ABCD-EFGH"
+            placeholder={t("join.placeholder")}
             value={code}
             onChange={(event) => setCode(event.target.value)}
             disabled={submitting || !isSignedIn}
@@ -211,30 +211,30 @@ export default function OnboardingPage() {
             disabled={submitting || !isSignedIn}
             className="inline-flex w-fit items-center rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? "Joining..." : "Join store"}
+            {submitting ? t("join.submitting") : t("join.submit")}
           </button>
         </form>
       </section>
 
       <section className="rounded border border-neutral-200 p-4">
-        <h2 className="text-lg font-medium">Create a new store</h2>
-        <p className="mt-1 text-sm text-neutral-500">Start fresh and invite teammates once your store is ready.</p>
+        <h2 className="text-lg font-medium">{t("create.title")}</h2>
+        <p className="mt-1 text-sm text-neutral-500">{t("create.description")}</p>
         <button
           type="button"
           onClick={handleCreateStore}
           disabled={submitting}
           className="mt-4 inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Create store
+          {t("create.button")}
         </button>
       </section>
 
       {syncStartedAt && !confirmed ? (
         <div className="flex items-center gap-2 text-xs text-neutral-500">
-          <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-700">Syncing membership...</span>
+          <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-700">{t("sync.message")}</span>
           {syncExceeded ? (
             <button type="button" className="text-blue-600 underline" onClick={handleRefresh} disabled={submitting}>
-              Reload
+              {t("sync.reload")}
             </button>
           ) : null}
         </div>
@@ -248,9 +248,9 @@ export default function OnboardingPage() {
       ) : null}
 
       <div className="text-xs text-neutral-400">
-        If you already accepted an invite, refresh the page after 10 seconds if the dashboard does not unlock.
+        {t("sync.footnote")}
         <button type="button" onClick={handleRefresh} className="ml-1 underline disabled:opacity-60" disabled={submitting}>
-          Refresh now
+          {t("sync.footnoteButton")}
         </button>
       </div>
     </div>

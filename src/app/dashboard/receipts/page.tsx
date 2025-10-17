@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,7 +19,7 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, ref } from "firebase/storage";
 import { auth, db, storage } from "../../../lib/firebase/client";
-import { useUserPermissions } from "../../../lib/hooks/useUserPermissions";
+import { useDashboardPermissions } from "../PermissionsProvider";
 import { runBulkAnalysis } from "../../../lib/api.client";
 import type { ReceiptRecord, ReceiptStatus, ReceiptFraudFlag, ReceiptSummaryLineItem } from "../../../types/receipt";
 import type { StoreDoc } from "../../../types/store";
@@ -40,6 +40,13 @@ interface ToastMessage {
 
 const ALL_STORES_OPTION = "all" as const;
 const STATUS_OPTIONS: ("all" | ReceiptStatus)[] = ["all", "draft", "pending", "confirmed", "reviewed", "locked"];
+type SortOption = "uploaded-desc" | "uploaded-asc" | "receipt-desc" | "receipt-asc";
+const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
+  { value: "uploaded-desc", label: "Uploaded (newest first)" },
+  { value: "uploaded-asc", label: "Uploaded (oldest first)" },
+  { value: "receipt-desc", label: "Receipt date (newest first)" },
+  { value: "receipt-asc", label: "Receipt date (oldest first)" },
+];
 
 function formatJst(timestamp: Timestamp): string {
   const date = timestamp.toDate();
@@ -224,8 +231,8 @@ function buildDisplaySummary(row: ReceiptRow): {
         taxRate: normaliseTaxRate(null, ocrAmount, ocrTax ?? undefined),
         label: null,
         source: "ocr",
-      };
-    }
+  };
+}
   }
 
   if (main.taxRate === null && main.amount !== null) {
@@ -235,9 +242,49 @@ function buildDisplaySummary(row: ReceiptRow): {
   return { currency, main, breakdown: remainingBreakdown };
 }
 
+function timestampMillis(value?: Timestamp | null): number | null {
+  if (!value) {
+    return null;
+  }
+  try {
+    return value.toMillis();
+  } catch {
+    return null;
+  }
+}
+
+function parseReceiptDate(value?: string | null): number | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const isoCandidate = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? `${trimmed}T00:00:00+09:00` : trimmed;
+  const millis = Date.parse(isoCandidate);
+  return Number.isNaN(millis) ? null : millis;
+}
+
+function receiptDateMillis(row: ReceiptRow): number | null {
+  const summaryDate = parseReceiptDate(row.summary?.date ?? null);
+  if (summaryDate !== null) {
+    return summaryDate;
+  }
+  const ocrDate = parseReceiptDate(row.ocr?.date ?? null);
+  if (ocrDate !== null) {
+    return ocrDate;
+  }
+  const exifDate = parseReceiptDate(row.meta?.exifShotAt ?? null);
+  if (exifDate !== null) {
+    return exifDate;
+  }
+  return timestampMillis(row.createdAt);
+}
+
 export default function ReceiptsPage() {
   const router = useRouter();
-  const { permissions, loading: permissionsLoading, optimisticMemberships, confirmed, authReady } = useUserPermissions();
+  const { permissions, loading: permissionsLoading, optimisticMemberships, confirmed, authReady } = useDashboardPermissions();
   const searchParams = useSearchParams();
   const requestedStoreId = searchParams.get("store");
 
@@ -246,6 +293,7 @@ export default function ReceiptsPage() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [rows, setRows] = useState<ReceiptRow[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>("uploaded-desc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<string | null>(null);
@@ -537,11 +585,33 @@ export default function ReceiptsPage() {
   }, [availableStoreIds, endDate, featureDisabled, reloadCount, startDate, status, storeId]);
 
 
-  const rowsCount = rows.length;
+  const sortedRows = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const createdA = timestampMillis(a.createdAt) ?? 0;
+      const createdB = timestampMillis(b.createdAt) ?? 0;
+      const receiptA = receiptDateMillis(a) ?? createdA;
+      const receiptB = receiptDateMillis(b) ?? createdB;
+      switch (sortOption) {
+        case "uploaded-asc":
+          return createdA - createdB;
+        case "receipt-desc":
+          return receiptB - receiptA;
+        case "receipt-asc":
+          return receiptA - receiptB;
+        case "uploaded-desc":
+        default:
+          return createdB - createdA;
+      }
+    });
+    return copy;
+  }, [rows, sortOption]);
+
+  const rowsCount = sortedRows.length;
 
   useEffect(() => {
-    setSelectedIds((prev) => prev.filter((id) => rows.some((row) => row.id === id)));
-  }, [rows]);
+    setSelectedIds((prev) => prev.filter((id) => sortedRows.some((row) => row.id === id)));
+  }, [sortedRows]);
 
   const allSelected = rowsCount > 0 && selectedIds.length === rowsCount;
   const partiallySelected = selectedIds.length > 0 && !allSelected;
@@ -566,9 +636,9 @@ export default function ReceiptsPage() {
       setSelectedIds([]);
       setAnalysisStatus(null);
     } else {
-      setSelectedIds(rows.map((row) => row.id));
+      setSelectedIds(sortedRows.map((row) => row.id));
     }
-  }, [allSelected, rows]);
+  }, [allSelected, sortedRows]);
 
   const handleBulkAnalyze = useCallback(async () => {
     if (!selectedIds.length) {
@@ -756,6 +826,23 @@ export default function ReceiptsPage() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium" htmlFor="sort-option">
+              Sort by
+            </label>
+            <select
+              id="sort-option"
+              className="w-56 rounded border border-neutral-300 px-2 py-1 text-sm"
+              value={sortOption}
+              onChange={(event) => setSortOption(event.target.value as SortOption)}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
             <label className="text-xs font-medium" htmlFor="start-date">
               Start date
             </label>
@@ -858,14 +945,14 @@ export default function ReceiptsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {sortedRows.length === 0 ? (
                 <tr>
                   <td className="p-6 text-center text-neutral-500" colSpan={11}>
                     {loading ? "Loading receiptsc" : storeId ? "No receipts found." : "Select a store to view receipts."}
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                sortedRows.map((row) => {
                   const { currency, main, breakdown } = buildDisplaySummary(row);
                   const amountCellClassName = `p-3 text-right text-neutral-700${breakdown.length ? " align-top" : ""}`;
                   const taxCellClassName = `p-3 text-right text-neutral-700${breakdown.length ? " align-top" : ""}`;
@@ -918,7 +1005,7 @@ export default function ReceiptsPage() {
                         <td className="p-3 text-neutral-700">{row.uploaderName || row.uploaderId}</td>
                         <td className="p-3 text-neutral-700">{row.purpose ?? "?"}</td>
                         <td className="p-3 text-neutral-700">{describePayment(row)}</td>
-                        <td className="p-3 text-center text-neutral-700">{row.advancePayment ? "〇" : ""}</td>
+                        <td className="p-3 text-center text-neutral-700">{row.advancePayment ? "Advance" : ""}</td>
                       </tr>
                       {breakdown.map((entry) => {
                         const hasEntryTaxRate = typeof entry.taxRate === "number" && Number.isFinite(entry.taxRate);
@@ -981,6 +1068,9 @@ export default function ReceiptsPage() {
     </div>
   );
 }
+
+
+
 
 
 

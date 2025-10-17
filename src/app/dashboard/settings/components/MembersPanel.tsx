@@ -207,48 +207,41 @@ export function MembersPanel({
     }
   }, [storeId]);
 
-  const loadInvites = useCallback(async () => {
-    if (!storeId || !effectiveCanManage) {
-      setInvites([]);
-      setInvitesError(null);
-      return;
-    }
-    const user = auth.currentUser;
-    if (!user) {
-      setInvitesError("Sign in to manage invites.");
-      setInvites([]);
-      return;
-    }
-    setInvitesLoading(true);
-    setInvitesError(null);
-    try {
-      const token = await user.getIdToken();
-      const response = await fetch(
-        `/api/stores/${encodeURIComponent(storeId)}/invites`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        setInvitesError(payload?.error ?? "Failed to load invites.");
+  const loadInvites = useCallback(
+    async (force = false) => {
+      if (!storeId || !effectiveCanManage) {
         setInvites([]);
+        setInvitesError(null);
+        setInvitesLoading(false);
         return;
       }
-      const inviteList = Array.isArray(payload?.invites)
-        ? (payload.invites as InviteRow[])
-        : [];
-      setInvites(inviteList);
-    } catch (error) {
-      console.error("[settings] failed to load invites", error);
-      setInvitesError("Network error while loading invites.");
-      setInvites([]);
-    } finally {
-      setInvitesLoading(false);
-    }
-  }, [effectiveCanManage, storeId]);
+
+      if (!force) {
+        const cached = peekCachedStoreInvites(storeId);
+        if (cached) {
+          setInvites(cached.map(mapInviteRecord));
+          setInvitesError(null);
+          setInvitesLoading(false);
+          return;
+        }
+      }
+
+      setInvitesLoading(true);
+      setInvitesError(null);
+      try {
+        const records = await fetchStoreInvites(storeId, { force });
+        setInvites(records.map(mapInviteRecord));
+      } catch (error) {
+        console.error("[settings] failed to load invites", error);
+        const message = (error as Error)?.message ?? "Failed to load invites.";
+        setInvitesError(message);
+        setInvites([]);
+      } finally {
+        setInvitesLoading(false);
+      }
+    },
+    [effectiveCanManage, storeId],
+  );
 
   useEffect(() => {
     editingMemberIdRef.current = editingMemberId;
@@ -317,46 +310,30 @@ export function MembersPanel({
         );
         return;
       }
-      const user = auth.currentUser;
-      if (!user) {
+      if (!auth.currentUser) {
         pushToast("error", "Sign in again to continue.");
         return;
       }
       setCreatingInvite(true);
       try {
-        const token = await user.getIdToken();
-        const response = await fetch(
-          `/api/stores/${encodeURIComponent(storeId)}/invites`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              role,
-              flags: inviteFlags,
-              maxUses,
-              expiresAt: expiresAt || null,
-              note: note ? note.slice(0, 160) : null,
-            }),
-          },
-        );
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) {
-          pushToast("error", payload?.error ?? "Failed to create invite.");
-          return;
-        }
+        await createStoreInvite(storeId, {
+          role,
+          flags: inviteFlags,
+          maxUses,
+          expiresAt: expiresAt || null,
+          note: note ? note.slice(0, 160) : null,
+        });
         pushToast("success", "Invite created.");
         setNote("");
         setExpiresAt("");
         setRole("staff");
         setMaxUses(1);
         setInviteFlags([]);
-        await loadInvites();
+        await loadInvites(true);
       } catch (error) {
         console.error("[settings] failed to create invite", error);
-        pushToast("error", "Network error while creating invite.");
+        const message = (error as Error)?.message ?? "Network error while creating invite.";
+        pushToast("error", message);
       } finally {
         setCreatingInvite(false);
       }
@@ -384,32 +361,18 @@ export function MembersPanel({
         pushToast("error", "You do not have permission to revoke invites.");
         return;
       }
-      const user = auth.currentUser;
-      if (!user) {
+      if (!auth.currentUser) {
         pushToast("error", "Sign in again to continue.");
         return;
       }
       try {
-        const token = await user.getIdToken();
-        const response = await fetch(
-          `/api/stores/${encodeURIComponent(storeId)}/invites/${encodeURIComponent(inviteId)}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) {
-          pushToast("error", payload?.error ?? "Failed to revoke invite.");
-          return;
-        }
+        await revokeStoreInvite(storeId, inviteId);
         pushToast("success", "Invite revoked.");
-        await loadInvites();
+        await loadInvites(true);
       } catch (error) {
         console.error("[settings] failed to revoke invite", error);
-        pushToast("error", "Network error while revoking invite.");
+        const message = (error as Error)?.message ?? "Network error while revoking invite.";
+        pushToast("error", message);
       }
     },
     [effectiveCanManage, loadInvites, pushToast, storeId],
@@ -575,7 +538,7 @@ export function MembersPanel({
                     colSpan={effectiveCanManage ? 7 : 6}
                   >
                     {memberSearch.trim()
-                      ? `No members match �g${memberSearch.trim()}�h.`
+                      ? `No members match "${memberSearch.trim()}".`
                       : "No members found."}
                   </td>
                 </tr>
@@ -972,3 +935,7 @@ export function MembersPanel({
     </section>
   );
 }
+
+
+
+

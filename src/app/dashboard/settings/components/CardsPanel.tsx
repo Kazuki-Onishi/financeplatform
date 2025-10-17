@@ -92,6 +92,7 @@ export function CardsPanel({
   const [membersError, setMembersError] = useState<string | null>(null);
   const [ownerModalOpen, setOwnerModalOpen] = useState(false);
   const [ownerSearch, setOwnerSearch] = useState("");
+  const [storeSelectionDirty, setStoreSelectionDirty] = useState(false);
 
   const memberLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -325,18 +326,19 @@ export function CardsPanel({
       ownerIds: [],
       storeId: selectedStoreId ?? "",
     });
+    setStoreSelectionDirty(false);
     setSavingId(null);
   }, [selectedStoreId]);
 
   useEffect(() => {
-    if (formState.id) {
+    if (formState.id || storeSelectionDirty) {
       return;
     }
     const next = selectedStoreId ?? "";
     if (formState.storeId !== next) {
       setFormState((prev) => ({ ...prev, storeId: next }));
     }
-  }, [formState.id, formState.storeId, selectedStoreId]);
+  }, [formState.id, formState.storeId, selectedStoreId, storeSelectionDirty]);
 
   useEffect(() => {
     const targetStoreId =
@@ -555,6 +557,7 @@ export function CardsPanel({
         ownerIds,
         storeId: card.storeId ?? "",
       });
+      setStoreSelectionDirty(true);
     },
     [setFormState],
   );
@@ -837,7 +840,10 @@ export function CardsPanel({
           <select
             value={formState.storeId}
             onChange={(event) =>
-              setFormState((prev) => ({ ...prev, storeId: event.target.value }))
+              setFormState((prev) => {
+                setStoreSelectionDirty(true);
+                return { ...prev, storeId: event.target.value };
+              })
             }
             disabled={!canManage || !!savingId || creating}
             className="rounded border border-neutral-300 px-3 py-2"

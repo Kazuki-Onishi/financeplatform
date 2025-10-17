@@ -254,7 +254,7 @@ export function AdminInviteManager({ stores, selectedStoreId, onSelectStore, cla
                         <div className="font-medium">{invite.code}</div>
                         <div className="text-xs text-neutral-500">Role: {invite.role}</div>
                         <div className="text-xs text-neutral-500">Uses: {invite.used}/{invite.maxUses || "∞"}</div>
-                        <div className="text-xs text-neutral-500">Flags: {invite.flags.length ? invite.flags.join(", ") : "–"}</div>
+                        <div className="text-xs text-neutral-500">Flags: {invite.flags.length ? invite.flags.join(", ") : "?"}</div>
                         <div className="text-xs text-neutral-500">Status: {invite.status}</div>
                         {invite.expiresAt ? (
                           <div className="text-xs text-neutral-500">Expires: {new Date(invite.expiresAt).toLocaleString()}</div>

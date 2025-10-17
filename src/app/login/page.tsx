@@ -65,6 +65,8 @@ export default function LoginPage() {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [fullName, setFullName] = useState("");
+  const [isLineInAppBrowser, setIsLineInAppBrowser] = useState(false);
+  const [currentUrl, setCurrentUrl] = useState<string | null>(null);
 
   const nextParam = searchParams.get("next");
   const nextUrl = useMemo(() => {
@@ -100,6 +102,17 @@ export default function LoginPage() {
     }
     setFullName((prev) => (prev ? prev : user.displayName ?? ""));
   }, [user?.displayName]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const userAgent = window.navigator.userAgent || "";
+    if (/Line\//i.test(userAgent)) {
+      setIsLineInAppBrowser(true);
+    }
+    setCurrentUrl(window.location.href);
+  }, []);
 
   const ensureUserProfile = useCallback(
     async (currentUser: User | null, preferredName?: string | null): Promise<string | null> => {
@@ -159,6 +172,13 @@ export default function LoginPage() {
   );
 
   const handleGoogleSignIn = useCallback(() => {
+    if (isLineInAppBrowser) {
+      setStatus({
+        kind: "error",
+        text: "Google sign-in is disabled inside the LINE in-app browser. Please open this page in your device's browser.",
+      });
+      return;
+    }
     runWithBusy(async () => {
       setStatus(null);
       try {
@@ -179,7 +199,7 @@ export default function LoginPage() {
         setStatus({ kind: "error", text: "Google sign-in failed" });
       }
     });
-  }, [ensureUserProfile, nextUrl, router, runWithBusy]);
+  }, [ensureUserProfile, isLineInAppBrowser, nextUrl, router, runWithBusy]);
 
   const handleEmailSignIn = useCallback(() => {
     runWithBusy(async () => {
@@ -320,10 +340,29 @@ export default function LoginPage() {
 
       <section className="flex flex-col gap-4 rounded border border-neutral-200 p-4">
         <h2 className="text-lg font-medium text-neutral-800">Sign in with Google</h2>
+        {isLineInAppBrowser ? (
+          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="font-medium">Google sign-in is not available inside the LINE in-app browser.</p>
+            <p className="mt-1">
+              Please open this page in your device&apos;s browser (menu -&gt; &quot;Open in external browser&quot;) or use the link
+              below.
+            </p>
+            {currentUrl ? (
+              <a
+                className="mt-3 inline-block rounded border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                href={currentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open in external browser
+              </a>
+            ) : null}
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={handleGoogleSignIn}
-          disabled={busy}
+          disabled={busy || isLineInAppBrowser}
           className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
         >
           Continue with Google

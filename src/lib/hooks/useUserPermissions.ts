@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { onSnapshot, type DocumentSnapshot, type QuerySnapshot } from "firebase/firestore";
@@ -22,7 +22,7 @@ import type {
   UserPermissionsDoc,
   UserPermissionsState,
 } from "../../types/permissions";
-interface UseUserPermissionsResult {
+export interface UseUserPermissionsResult {
   loading: boolean;
   error: Error | null;
   permissions: UserPermissionsState | null;
@@ -401,3 +401,4 @@ export function useUserPermissions(preload?: PermissionsPreloadInput): UseUserPe
     hasPreload,
   };
 }
+

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "@/lib/i18n/I18nProvider";
 import { useAppSelector } from "@/lib/state/store";
 import { auth, firebaseApp } from "@/lib/firebase/client";
-import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
+import { useDashboardPermissions } from "../PermissionsProvider";
 
 import { UploadInformationPanel } from "./components/UploadInformationPanel";
 import { UploadDropzone } from "./components/UploadDropzone";
@@ -35,7 +35,7 @@ export default function UploadPage() {
     confirmed,
     authReady,
     currentUid,
-  } = useUserPermissions();
+  } = useDashboardPermissions();
 
   const preload = useAppSelector((state) => state.permissions);
   const sameUserPreload =
@@ -346,3 +346,5 @@ export default function UploadPage() {
   </div>
 );
 }
+
+

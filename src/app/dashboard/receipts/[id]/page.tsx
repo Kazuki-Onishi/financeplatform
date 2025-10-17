@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/lib/i18n/I18nProvider";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import {
   collection,
   endBefore,
@@ -19,7 +19,7 @@ import { getDownloadURL, ref } from "firebase/storage";
 import SummaryPanel, { type SummaryPreview } from "./SummaryPanel";
 import { receiptDoc, storeDoc } from "../../../../lib/firestoreRefs";
 import { db, storage } from "../../../../lib/firebase/client";
-import { useUserPermissions } from "../../../../lib/hooks/useUserPermissions";
+import { useDashboardPermissions } from "../../PermissionsProvider";
 import {
   canEdit as canEditUtil,
   canView as canViewUtil,
@@ -116,6 +116,7 @@ function resolveAmountSourceLabel(
 
 export default function ReceiptDetailPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const tCommon = useTranslations("common");
   const tDetail = useTranslations("receipts.detailPage");
   const tStatusLabel = useTranslations("receipts.status");
@@ -127,7 +128,7 @@ export default function ReceiptDetailPage() {
     permissions,
     loading: permissionsLoading,
     authReady,
-  } = useUserPermissions();
+  } = useDashboardPermissions();
   const [receipt, setReceipt] = useState<ReceiptRecord | null>(null);
   const [storeName, setStoreName] = useState<string>("-");
   const [loadingReceipt, setLoadingReceipt] = useState(true);
@@ -140,6 +141,16 @@ export default function ReceiptDetailPage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [navigatingPrev, setNavigatingPrev] = useState(false);
   const [navigatingNext, setNavigatingNext] = useState(false);
+  const isPassbookDetail = useMemo(() => {
+    if (receipt?.sourceType === "passbook") {
+      return true;
+    }
+    if (!pathname) {
+      return false;
+    }
+    return pathname.includes("/dashboard/passbooks/");
+  }, [pathname, receipt?.sourceType]);
+  const detailBasePath = isPassbookDetail ? "/dashboard/passbooks" : "/dashboard/receipts";
   const storeId = receipt?.storeId ?? null;
   const pushToast = useCallback((type: ToastKind, message: string) => {
     const id = crypto.randomUUID();
@@ -173,8 +184,12 @@ export default function ReceiptDetailPage() {
           return;
         }
         const data = snapshot.data() as ReceiptRecord;
+        const resolvedSourceType =
+          data.sourceType ??
+          (pathname && pathname.includes("/dashboard/passbooks/") ? "passbook" : "receipt");
         const record = {
           ...data,
+          sourceType: resolvedSourceType,
           id: snapshot.id,
         };
         setReceipt(record);
@@ -199,7 +214,7 @@ export default function ReceiptDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [authReady, permissionsLoading, receiptId, tDetail]);
+  }, [authReady, permissionsLoading, receiptId, tDetail, pathname]);
   useEffect(() => {
     if (!storeId) {
       setStoreName("-");
@@ -423,8 +438,8 @@ export default function ReceiptDetailPage() {
     setFilters(createDefaultFilters(receipt));
   }, [receipt]);
   const handleBackToList = useCallback(() => {
-    router.push("/dashboard/receipts");
-  }, [router]);
+    router.push(detailBasePath);
+  }, [detailBasePath, router]);
   const handleGoToPrev = useCallback(async () => {
     if (!receipt) {
       return;
@@ -437,10 +452,14 @@ export default function ReceiptDetailPage() {
     }
     setNavigatingPrev(true);
     try {
+      const sourceConstraint = isPassbookDetail
+        ? where("sourceType", "==", "passbook")
+        : where("sourceType", "in", ["receipt", "label"]);
       const snapshot = await getDocs(
         query(
           collection(db, "receipts"),
           where("storeId", "==", storeId),
+          sourceConstraint,
           orderBy("createdAt", "desc"),
           endBefore(createdAt),
           limit(1),
@@ -450,14 +469,14 @@ export default function ReceiptDetailPage() {
         pushToast("info", tDetail("toasts.noPrevious"));
         return;
       }
-      router.push(`/dashboard/receipts/${snapshot.docs[0].id}`);
+      router.push(`${detailBasePath}/${snapshot.docs[0].id}`);
     } catch (navigationError) {
       console.error(tDetail("errors.loadPrevious"), navigationError);
       pushToast("error", tDetail("errors.loadPrevious"));
     } finally {
       setNavigatingPrev(false);
     }
-  }, [filters.storeId, receipt, pushToast, router, tDetail]);
+  }, [detailBasePath, filters.storeId, isPassbookDetail, receipt, pushToast, router, tDetail]);
   const handleGoToNext = useCallback(async () => {
     if (!receipt) {
       return;
@@ -470,10 +489,14 @@ export default function ReceiptDetailPage() {
     }
     setNavigatingNext(true);
     try {
+      const sourceConstraint = isPassbookDetail
+        ? where("sourceType", "==", "passbook")
+        : where("sourceType", "in", ["receipt", "label"]);
       const snapshot = await getDocs(
         query(
           collection(db, "receipts"),
           where("storeId", "==", storeId),
+          sourceConstraint,
           orderBy("createdAt", "desc"),
           startAfter(createdAt),
           limit(1),
@@ -483,14 +506,14 @@ export default function ReceiptDetailPage() {
         pushToast("info", tDetail("toasts.noNext"));
         return;
       }
-      router.push(`/dashboard/receipts/${snapshot.docs[0].id}`);
+      router.push(`${detailBasePath}/${snapshot.docs[0].id}`);
     } catch (navigationError) {
       console.error(tDetail("errors.loadNext"), navigationError);
       pushToast("error", tDetail("errors.loadNext"));
     } finally {
       setNavigatingNext(false);
     }
-  }, [filters.storeId, receipt, pushToast, router, tDetail]);
+  }, [detailBasePath, filters.storeId, isPassbookDetail, receipt, pushToast, router, tDetail]);
   const handleCancelChanges = useCallback(() => {
     pushToast("info", tDetail("toasts.noPendingChanges"));
   }, [pushToast, tDetail]);
@@ -877,4 +900,5 @@ export default function ReceiptDetailPage() {
     </div>
   );
 }
+
 

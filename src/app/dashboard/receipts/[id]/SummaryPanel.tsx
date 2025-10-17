@@ -8,11 +8,22 @@ import { cleanAmount, toIsoDate } from "@/lib/ocrPassbook";
 import { toHalfWidth } from "@/lib/text/width";
 import { receiptDoc } from "@/lib/firestoreRefs";
 import { PURPOSE_NOTE_MAX_LENGTH, PURPOSE_OPTIONS, findPurposeOption } from "@/lib/purposeOptions";
-import type { ReceiptOcrData, ReceiptPassbookEntry, ReceiptRecord, ReceiptSummaryData, ReceiptSummaryLineItem } from "@/types/receipt";
+import { PURCHASE_PURPOSE_MAX_LENGTH } from "@/app/dashboard/upload/constants";
+import { useTranslations } from "@/lib/i18n/I18nProvider";
+import type {
+  ReceiptOcrData,
+  ReceiptPassbookEntry,
+  ReceiptPaymentMethod,
+  ReceiptPaymentMethodType,
+  ReceiptRecord,
+  ReceiptSummaryData,
+  ReceiptSummaryLineItem,
+} from "@/types/receipt";
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "";
 
 const COMMON_TAX_RATES = [10, 8, 0];
+const PAYMENT_CARD_ID_MAX_LENGTH = 64;
 
 type ToastKind = "success" | "error" | "info";
 
@@ -44,6 +55,8 @@ type SummaryFormState = {
   purposeKey: string | null;
   purposeLabel: string | null;
   purposeNote: string | null;
+  purchasePurpose: string | null;
+  advancePayment: boolean;
   lineItems: SummaryLineItemState[];
 };
 
@@ -85,6 +98,8 @@ const DEFAULT_FORM: SummaryFormState = {
   purposeKey: null,
   purposeLabel: null,
   purposeNote: null,
+  purchasePurpose: null,
+  advancePayment: false,
   lineItems: [],
 };
 
@@ -223,9 +238,19 @@ function normaliseTaxRate(
 }
 
 export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpdate, previews = [], maxLineItems = MAX_LINE_ITEMS, onConfirm, confirmDisabled, summariesEnabled = true }: SummaryPanelProps) {
+  const t = useTranslations("receipts.summaryPanel");
   const [summaryForm, setSummaryForm] = useState<SummaryFormState>(DEFAULT_FORM);
   const [summaryMeta, setSummaryMeta] = useState<SummaryMetaState>(DEFAULT_META);
   const [summaryDirty, setSummaryDirty] = useState(false);
+  const [paymentMethodType, setPaymentMethodType] = useState<ReceiptPaymentMethodType>(
+    () => receipt.paymentMethod?.type ?? "cash",
+  );
+  const [paymentMethodCardId, setPaymentMethodCardId] = useState<string>(
+    () =>
+      receipt.paymentMethod?.type === "credit" && typeof receipt.paymentMethod?.cardId === "string"
+        ? receipt.paymentMethod.cardId
+        : "",
+  );
   const [ocrPreview, setOcrPreview] = useState<string>("");
   const [latestOcr, setLatestOcr] = useState<ReceiptOcrData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -327,7 +352,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
 
   const handleSavePassbookEntries = useCallback(async () => {
     if (!canEdit) {
-      pushToast("error", "You do not have permission to edit passbook entries.");
+      pushToast("error", t("toasts.passbookNoPermission"));
       return;
     }
     setPassbookSaving(true);
@@ -387,12 +412,12 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       setPassbookDraft(nextEntries.length ? buildPassbookDraft(nextEntries) : []);
       setPassbookDirty(false);
       setEditingPassbook(false);
-      pushToast("success", "Passbook entries updated.");
+      pushToast("success", t("toasts.passbookSaved"));
     } catch (err) {
       console.error("Failed to save passbook entries", err);
-      const message = err instanceof Error ? err.message : "Failed to save passbook entries.";
-      setPassbookEditError(message);
-      pushToast("error", message);
+      const fallbackMessage = t("toasts.passbookSaveFailed");
+      setPassbookEditError(fallbackMessage);
+      pushToast("error", fallbackMessage);
     } finally {
       setPassbookSaving(false);
     }
@@ -452,6 +477,24 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
           })
       : [];
 
+    const summaryPurchasePurposeRaw =
+      typeof nextSummary?.purchasePurpose === "string" ? nextSummary.purchasePurpose : null;
+    const initialPurchasePurpose =
+      summaryPurchasePurposeRaw ??
+      (typeof receipt.purchasePurpose === "string" ? receipt.purchasePurpose : null);
+    const sanitizedPurchasePurpose = initialPurchasePurpose
+      ? initialPurchasePurpose.slice(0, PURCHASE_PURPOSE_MAX_LENGTH)
+      : null;
+    const initialAdvancePayment =
+      typeof nextSummary?.advancePayment === "boolean"
+        ? nextSummary.advancePayment
+        : Boolean(receipt.advancePayment);
+    const initialPaymentType = receipt.paymentMethod?.type ?? "cash";
+    const initialPaymentCardId =
+      receipt.paymentMethod?.type === "credit" && typeof receipt.paymentMethod?.cardId === "string"
+        ? receipt.paymentMethod.cardId
+        : "";
+
     setSummaryForm({
       date: nextSummary?.date ?? receipt.ocr?.date ?? null,
       vendor: nextSummary?.vendor ?? receipt.ocr?.vendorName ?? null,
@@ -466,8 +509,12 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       purposeKey: initialPurposeKey,
       purposeLabel: initialPurposeLabel,
       purposeNote: initialPurposeNote,
+      purchasePurpose: sanitizedPurchasePurpose,
+      advancePayment: initialAdvancePayment,
       lineItems: summaryItems,
     });
+    setPaymentMethodType(initialPaymentType);
+    setPaymentMethodCardId(initialPaymentCardId);
     setSummaryMeta({
       language: nextSummary?.language ?? null,
       keywords: Array.isArray(nextSummary?.keywords)
@@ -622,14 +669,94 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     setSummaryDirty(true);
   }, []);
 
+  const handlePurchasePurposeChange = useCallback((value: string) => {
+    if (!canEdit) {
+      return;
+    }
+    const sanitized = value.slice(0, PURCHASE_PURPOSE_MAX_LENGTH);
+    const nextValue = sanitized.length ? sanitized : null;
+    let changed = false;
+    setSummaryForm((prev) => {
+      if (prev.purchasePurpose === nextValue) {
+        return prev;
+      }
+      changed = true;
+      return {
+        ...prev,
+        purchasePurpose: nextValue,
+      };
+    });
+    if (changed) {
+      setSummaryDirty(true);
+    }
+  }, [canEdit, setSummaryDirty]);
+
+  const handleAdvancePaymentChange = useCallback((value: boolean) => {
+    if (!canEdit) {
+      return;
+    }
+    let changed = false;
+    setSummaryForm((prev) => {
+      if (prev.advancePayment === value) {
+        return prev;
+      }
+      changed = true;
+      return {
+        ...prev,
+        advancePayment: value,
+      };
+    });
+    if (changed) {
+      setSummaryDirty(true);
+    }
+  }, [canEdit, setSummaryDirty]);
+
+  const handlePaymentMethodTypeChange = useCallback((value: ReceiptPaymentMethodType) => {
+    if (!canEdit) {
+      return;
+    }
+    let changed = false;
+    setPaymentMethodType((prev) => {
+      if (prev === value) {
+        return prev;
+      }
+      changed = true;
+      return value;
+    });
+    if (value !== "credit") {
+      setPaymentMethodCardId("");
+    }
+    if (changed) {
+      setSummaryDirty(true);
+    }
+  }, [canEdit, setSummaryDirty]);
+
+  const handlePaymentMethodCardIdChange = useCallback((value: string) => {
+    if (!canEdit) {
+      return;
+    }
+    const sanitized = value.slice(0, PAYMENT_CARD_ID_MAX_LENGTH);
+    let changed = false;
+    setPaymentMethodCardId((prev) => {
+      if (prev === sanitized) {
+        return prev;
+      }
+      changed = true;
+      return sanitized;
+    });
+    if (changed) {
+      setSummaryDirty(true);
+    }
+  }, [canEdit, setSummaryDirty]);
+
   const handleRun = useCallback(async () => {
     if (!canEdit) {
-      pushToast("error", "You do not have permission to run OCR on this receipt.");
+      pushToast("error", t("toasts.runNoPermission"));
       return;
     }
     const gcsInfo = buildGcsUri(receipt.filePath);
     if (!gcsInfo) {
-      pushToast("error", "Storage bucket configuration is missing or file path is invalid.");
+      pushToast("error", t("errors.storageConfig"));
       return;
     }
     setLoading(true);
@@ -638,7 +765,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       const ocrResult = await callOCR(gcsInfo.gcsUri, "document", receipt.id);
       const text = typeof ocrResult.text === "string" ? ocrResult.text : "";
       if (!text) {
-        throw new Error("OCR returned empty text");
+        throw new Error(t("errors.ocrEmpty"));
       }
       setOcrPreview(text);
 
@@ -660,7 +787,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       if (!summariesEnabled) {
         setSummaryMeta(DEFAULT_META);
         setSummaryDirty(false);
-        pushToast("success", "OCR refreshed.");
+        pushToast("success", t("toasts.ocrRefreshed"));
         return;
       }
 
@@ -691,6 +818,15 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
           tax: normaliseTaxRate(resultTax, nextAmount, fallbackTaxAmount),
           currency: summaryResult.summary.currency ?? "JPY",
           memo: summaryResult.summary.memo ?? null,
+          purchasePurpose:
+            typeof summaryResult.summary.purchasePurpose === "string" &&
+            summaryResult.summary.purchasePurpose.length
+              ? summaryResult.summary.purchasePurpose.slice(0, PURCHASE_PURPOSE_MAX_LENGTH)
+              : prev.purchasePurpose,
+          advancePayment:
+            typeof summaryResult.summary.advancePayment === "boolean"
+              ? summaryResult.summary.advancePayment
+              : prev.advancePayment,
         };
       });
       setSummaryMeta({
@@ -700,12 +836,12 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
         modelVersion: summaryResult.modelVersion ?? null,
       });
       setSummaryDirty(false);
-      pushToast("success", "OCR and summary refreshed.");
+      pushToast("success", t("toasts.ocrSummaryRefreshed"));
     } catch (err) {
       console.error("Failed to run OCR and summarise", err);
-      const message = (err as Error).message ?? "Failed to run OCR and summarise.";
-      setError(message);
-      pushToast("error", message);
+      const fallbackMessage = t("toasts.runFailed");
+      setError(fallbackMessage);
+      pushToast("error", fallbackMessage);
     } finally {
       setLoading(false);
     }
@@ -713,19 +849,17 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
 
   const handleSave = useCallback(async () => {
     if (!canEdit) {
-      pushToast("error", "You do not have permission to save this summary.");
+      pushToast("error", t("toasts.summaryNoPermission"));
       return;
     }
     const gcsInfo = buildGcsUri(receipt.filePath);
     if (!gcsInfo) {
-      pushToast("error", "Storage bucket configuration is missing or file path is invalid.");
+      pushToast("error", t("errors.storageConfig"));
       return;
     }
     const wasConfirmed = receipt.status === "confirmed";
     if (wasConfirmed) {
-      const proceed = window.confirm(
-        "This receipt was already confirmed. Editing will move it back to Reviewed until you confirm again. Continue?",
-      );
+      const proceed = window.confirm(t("prompts.revertToReviewed"));
       if (!proceed) {
         return;
       }
@@ -749,6 +883,13 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             note: trimmedPurposeNote ? trimmedPurposeNote : null,
           }
         : null;
+      const trimmedPurchasePurpose = (summaryForm.purchasePurpose ?? "").trim();
+      const purchasePurposeValue = trimmedPurchasePurpose.length ? trimmedPurchasePurpose : null;
+      const trimmedCardId = paymentMethodCardId.trim();
+      const paymentMethodPayload: ReceiptPaymentMethod = {
+        type: paymentMethodType,
+        cardId: paymentMethodType === "credit" ? (trimmedCardId.length ? trimmedCardId : null) : null,
+      };
 
       const itemsPayload = summaryForm.lineItems
         .map<ReceiptSummaryLineItem>((item) => {
@@ -783,6 +924,8 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
         currency: summaryForm.currency ?? "JPY",
         memo: summaryForm.memo,
         purpose: purposePayload,
+        purchasePurpose: purchasePurposeValue,
+        advancePayment: summaryForm.advancePayment,
         source: "gemini",
         edited: summaryDirty,
         language: summaryMeta.language ?? null,
@@ -810,6 +953,9 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
         summary: summaryPayload,
         file: filePayload,
         purpose: purposePayload?.label ?? null,
+        purchasePurpose: purchasePurposeValue,
+        advancePayment: summaryForm.advancePayment,
+        paymentMethod: paymentMethodPayload,
         updatedAt: serverTimestamp(),
         "meta.manualEdits": true,
       };
@@ -828,6 +974,9 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               summary: summaryPayload,
               file: filePayload,
               purpose: purposePayload?.label ?? null,
+              purchasePurpose: purchasePurposeValue,
+              advancePayment: summaryForm.advancePayment,
+              paymentMethod: paymentMethodPayload,
               status: wasConfirmed ? "reviewed" : prev.status,
               meta: {
                 ...prev.meta,
@@ -837,17 +986,13 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
           : prev,
       );
       setSummaryDirty(false);
-      pushToast(
-        wasConfirmed ? "info" : "success",
-        wasConfirmed
-          ? "Summary updated. Status reverted to reviewed - please confirm again."
-          : "Summary saved.",
-      );
+      const successMessage = wasConfirmed ? t("toasts.summaryUpdated") : t("toasts.summarySaved");
+      pushToast(wasConfirmed ? "info" : "success", successMessage);
     } catch (err) {
       console.error("Failed to save summary", err);
-      const message = (err as Error).message ?? "Failed to save summary.";
-      setError(message);
-      pushToast("error", message);
+      const fallbackMessage = t("toasts.summarySaveFailed");
+      setError(fallbackMessage);
+      pushToast("error", fallbackMessage);
     } finally {
       setSaving(false);
     }
@@ -865,8 +1010,8 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       <section className="flex flex-col gap-4 rounded border border-neutral-200 p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Passbook OCR</h2>
-            <p className="text-sm text-neutral-500">Vision OCR result for bankbook entries.</p>
+            <h2 className="text-lg font-semibold">{t("passbook.title")}</h2>
+            <p className="text-sm text-neutral-500">{t("passbook.subtitle")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -875,7 +1020,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               disabled={disableRun}
               className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Processing..." : "Run OCR"}
+              {loading ? t("buttons.processing") : t("buttons.runOcr")}
             </button>
             {editingPassbook ? (
               <>
@@ -885,7 +1030,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                   disabled={!passbookDirty || passbookSaving}
                   className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {passbookSaving ? "Saving..." : "Save"}
+                  {passbookSaving ? t("buttons.saving") : t("buttons.save")}
                 </button>
                 <button
                   type="button"
@@ -893,7 +1038,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                   disabled={passbookSaving}
                   className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Cancel
+                  {t("buttons.cancel")}
                 </button>
               </>
             ) : (
@@ -903,7 +1048,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                 disabled={!canEdit || passbookSaving}
                 className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Edit entries
+                {t("passbook.edit")}
               </button>
             )}
             {onConfirm ? (
@@ -913,7 +1058,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                 disabled={confirmDisabledState}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Confirm
+                {t("buttons.confirm")}
               </button>
             ) : null}
           </div>
@@ -928,11 +1073,11 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               <table className="min-w-full border border-neutral-200 text-sm">
                 <thead className="bg-neutral-50 text-neutral-600">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">日付</th>
-                    <th className="px-3 py-2 text-left font-medium">摘要</th>
-                    <th className="px-3 py-2 text-right font-medium">お支払金額</th>
-                    <th className="px-3 py-2 text-right font-medium">お預り金額</th>
-                    <th className="px-3 py-2 text-right font-medium">差引残高</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("passbook.columns.date")}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("passbook.columns.description")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("passbook.columns.withdrawal")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("passbook.columns.deposit")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("passbook.columns.balance")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -998,15 +1143,22 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                     ) : (
                       <tr className="border-t border-neutral-200">
                         <td className="px-3 py-3 text-center text-sm text-neutral-500" colSpan={5}>
-                          行がありません。「行を追加」を押して明細を追加してください。
+                          {t("passbook.empty.noDraftRows", { action: t("passbook.actions.addRow") })}
                         </td>
                       </tr>
                     )
                   ) : hasPassbookEntries ? (
                     passbookEntries.map((entry, index) => {
-                      const description = entry.description?.trim().length ? entry.description : "（摘要なし）";
+                      const description = entry.description?.trim().length
+                        ? entry.description
+                        : t("passbook.entries.noDescription");
                       const positionLabel =
-                        passbookEntries.length > 1 ? `明細 ${index + 1}/${passbookEntries.length}` : null;
+                        passbookEntries.length > 1
+                          ? t("passbook.entries.position", {
+                              current: index + 1,
+                              total: passbookEntries.length,
+                            })
+                          : null;
                       return (
                         <tr key={`${index}-${entry.rawDate ?? entry.date ?? index}`} className="border-t border-neutral-200">
                           <td className="px-3 py-2 text-sm text-neutral-700">{formatPassbookDate(entry) || "-"}</td>
@@ -1033,7 +1185,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                   ) : (
                     <tr className="border-t border-neutral-200">
                       <td className="px-3 py-4 text-center text-sm text-neutral-500" colSpan={5}>
-                        Vision OCR で通帳明細を検出できませんでした。
+                        {t("passbook.empty.noEntries")}
                       </td>
                     </tr>
                   )}
@@ -1047,9 +1199,9 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                   onClick={handleAddPassbookRow}
                   className="rounded border border-neutral-300 px-3 py-1 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed"
                 >
-                  行を追加
+                  {t("passbook.actions.addRow")}
                 </button>
-                <span>保存時に日付と金額は半角に正規化されます。</span>
+                <span>{t("passbook.hints.normalisation")}</span>
               </div>
             ) : null}
           </div>
@@ -1066,7 +1218,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                     : "bg-neutral-200 text-neutral-700"
                 } ${!hasImagePreviews ? "cursor-not-allowed opacity-60" : "hover:bg-blue-700 hover:text-white"}`}
               >
-                通帳画像
+                {t("passbook.tabs.image")}
               </button>
               <button
                 type="button"
@@ -1077,7 +1229,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                     : "bg-neutral-200 text-neutral-700 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                OCRテキスト
+                {t("passbook.tabs.ocr")}
               </button>
             </div>
             {activePreviewTab === "image" ? (
@@ -1089,7 +1241,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                   >
                     <Image
                       src={activePreview.url}
-                      alt={`Passbook preview ${activePreview.label}`}
+                      alt={t("passbook.previewAlt", { label: activePreview.label })}
                       fill
                       sizes="(min-width: 1024px) 420px, 100vw"
                       className="object-contain"
@@ -1130,12 +1282,12 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                 </div>
               ) : (
                 <p className="rounded border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
-                  通帳画像がありません。
+                  {t("passbook.empty.noImage")}
                 </p>
               )
             ) : (
               <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600">
-                {rawText || "（OCRテキストがありません）"}
+                {rawText || t("passbook.empty.noOcrText")}
               </pre>
             )}
           </div>
@@ -1148,8 +1300,8 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     <section className="flex flex-col gap-4 rounded border border-neutral-200 p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">AI Summary</h2>
-          <p className="text-sm text-neutral-500">Run OCR and Gemini summarisation for this receipt.</p>
+          <h2 className="text-lg font-semibold">{t("summary.title")}</h2>
+          <p className="text-sm text-neutral-500">{t("summary.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -1158,7 +1310,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             disabled={disableRun}
             className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Processing..." : "Run OCR + Summarise"}
+            {loading ? t("buttons.processing") : t("buttons.runOcrSummarise")}
           </button>
           <button
             type="button"
@@ -1166,7 +1318,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             disabled={disableSave}
             className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Save Summary"}
+            {saving ? t("buttons.saving") : t("buttons.saveSummary")}
           </button>
           {onConfirm ? (
             <button
@@ -1175,7 +1327,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               disabled={confirmDisabled}
               className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Confirm
+              {t("buttons.confirm")}
             </button>
           ) : null}
         </div>
@@ -1184,7 +1336,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {!STORAGE_BUCKET ? (
         <p className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-700">
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET is not set. Configure it to enable OCR.
+          {t("alerts.storageUnset")}
         </p>
       ) : null}
 
@@ -1201,7 +1353,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                   : "bg-neutral-200 text-neutral-700"
               } ${!hasImagePreviews ? "cursor-not-allowed opacity-60" : "hover:bg-blue-700 hover:text-white"}`}
             >
-              Receipt image
+              {t("tabs.image")}
             </button>
             <button
               type="button"
@@ -1212,7 +1364,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                   : "bg-neutral-200 text-neutral-700 hover:bg-blue-700 hover:text-white"
               }`}
             >
-              OCR text
+              {t("tabs.ocr")}
             </button>
           </div>
           {activePreviewTab === "image" ? (
@@ -1224,7 +1376,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                 >
                   <Image
                     src={activePreview.url}
-                    alt={`Receipt preview ${activePreview.label}`}
+                    alt={t("summary.previewAlt", { label: activePreview.label })}
                     fill
                     sizes="(min-width: 1024px) 420px, 100vw"
                     className="object-contain"
@@ -1265,7 +1417,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               </div>
             ) : (
               <p className="rounded border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
-                No receipt image available.
+                {t("empty.noImage")}
               </p>
             )
           ) : (
@@ -1276,14 +1428,14 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               }}
               rows={hasImagePreviews ? 12 : 16}
               className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
-              placeholder="Raw OCR text will appear here"
+              placeholder={t("empty.ocrPlaceholder")}
               disabled={!canEdit}
             />
           )}
         </div>
         <div className="grid gap-3">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-neutral-500">Date (YYYY-MM-DD)</span>
+            <span className="text-neutral-500">{t("fields.date")}</span>
             <input
               type="date"
               value={summaryForm.date ?? ""}
@@ -1293,18 +1445,18 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-neutral-500">Vendor</span>
+            <span className="text-neutral-500">{t("fields.vendor")}</span>
             <input
               type="text"
               value={summaryForm.vendor ?? ""}
               onChange={(event) => handleSummaryFieldChange("vendor", event.target.value ? event.target.value : null)}
               className="rounded border border-neutral-300 px-3 py-2"
-              placeholder="・ｽ・ｽ・ｽ[・ｽ\・ｽ・ｽ"
+              placeholder={t("fields.vendorPlaceholder")}
               disabled={!canEdit}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-neutral-500">Amount (JPY)</span>
+            <span className="text-neutral-500">{t("fields.amount")}</span>
             <input
               type="number"
               inputMode="decimal"
@@ -1318,7 +1470,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-neutral-500">Tax rate (%)</span>
+            <span className="text-neutral-500">{t("fields.taxRate")}</span>
             <input
               type="number"
               inputMode="decimal"
@@ -1334,25 +1486,25 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-neutral-500">Currency</span>
+            <span className="text-neutral-500">{t("fields.currency")}</span>
             <input
               type="text"
               value={summaryForm.currency ?? ""}
               onChange={(event) => handleSummaryFieldChange("currency", event.target.value ? event.target.value.toUpperCase() : null)}
               className="rounded border border-neutral-300 px-3 py-2 uppercase"
-              placeholder="JPY"
+              placeholder={t("fields.currencyPlaceholder")}
               disabled={!canEdit}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-neutral-500">Purpose</span>
+            <span className="text-neutral-500">{t("fields.purpose")}</span>
             <select
               value={summaryForm.purposeKey ?? ""}
               onChange={(event) => handlePurposeKeyChange(event.target.value)}
               disabled={!canEdit}
               className="rounded border border-neutral-300 px-3 py-2"
             >
-              <option value="">No purpose</option>
+              <option value="">{t("fields.purposeNone")}</option>
               {PURPOSE_OPTIONS.map((option) => (
                 <option key={option.key} value={option.key}>
                   {option.label}
@@ -1360,31 +1512,106 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
               ))}
             </select>
             <span className="text-xs text-neutral-500">
-              Optional. You can also add or edit this later in the receipt.
+              {t("fields.purposeHint")}
             </span>
           </label>
           {showPurposeNoteField ? (
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-neutral-500">Purpose note</span>
+              <span className="text-neutral-500">{t("fields.purposeNote")}</span>
               <input
                 type="text"
                 value={summaryForm.purposeNote ?? ""}
                 onChange={(event) => handlePurposeNoteChange(event.target.value)}
                 maxLength={PURPOSE_NOTE_MAX_LENGTH}
                 className="rounded border border-neutral-300 px-3 py-2"
-                placeholder="Add a short note (optional)"
+                placeholder={t("fields.purposeNotePlaceholder")}
                 disabled={!canEdit}
               />
             </label>
           ) : null}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-neutral-500">Memo</span>
+            <span className="text-neutral-500">{t("fields.purchasePurpose")}</span>
+            <input
+              type="text"
+              value={summaryForm.purchasePurpose ?? ""}
+              onChange={(event) => handlePurchasePurposeChange(event.target.value)}
+              maxLength={PURCHASE_PURPOSE_MAX_LENGTH}
+              className="rounded border border-neutral-300 px-3 py-2"
+              placeholder={t("fields.purchasePurposePlaceholder")}
+              disabled={!canEdit}
+            />
+            <span className="text-xs text-neutral-500">
+              {t("fields.purchasePurposeHelp", { max: PURCHASE_PURPOSE_MAX_LENGTH })}
+            </span>
+          </label>
+          <div className="flex flex-col gap-2 text-sm">
+            <span className="text-neutral-500">{t("fields.advancePayment")}</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleAdvancePaymentChange(true)}
+                className={`rounded border px-3 py-1 text-xs font-medium ${
+                  summaryForm.advancePayment
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-neutral-300 text-neutral-600 hover:bg-neutral-100"
+                }`}
+                aria-pressed={summaryForm.advancePayment}
+                disabled={!canEdit}
+              >
+                {t("fields.advanceYes")}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAdvancePaymentChange(false)}
+                className={`rounded border px-3 py-1 text-xs font-medium ${
+                  !summaryForm.advancePayment
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-neutral-300 text-neutral-600 hover:bg-neutral-100"
+                }`}
+                aria-pressed={!summaryForm.advancePayment}
+                disabled={!canEdit}
+              >
+                {t("fields.advanceNo")}
+              </button>
+            </div>
+          </div>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-neutral-500">{t("fields.paymentMethod")}</span>
+            <select
+              value={paymentMethodType}
+              onChange={(event) => handlePaymentMethodTypeChange(event.target.value as ReceiptPaymentMethodType)}
+              disabled={!canEdit}
+              className="rounded border border-neutral-300 px-3 py-2"
+            >
+              <option value="cash">{t("fields.paymentCash")}</option>
+              <option value="credit">{t("fields.paymentCredit")}</option>
+              <option value="bank">{t("fields.paymentBank")}</option>
+              <option value="other">{t("fields.paymentOther")}</option>
+            </select>
+          </label>
+          {paymentMethodType === "credit" ? (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-neutral-500">{t("fields.cardReference")}</span>
+              <input
+                type="text"
+                value={paymentMethodCardId}
+                onChange={(event) => handlePaymentMethodCardIdChange(event.target.value)}
+                maxLength={PAYMENT_CARD_ID_MAX_LENGTH}
+                className="rounded border border-neutral-300 px-3 py-2"
+                placeholder={t("fields.cardReferencePlaceholder")}
+                disabled={!canEdit}
+              />
+              <span className="text-xs text-neutral-500">{t("fields.cardReferenceHint")}</span>
+            </label>
+          ) : null}
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-neutral-500">{t("fields.memo")}</span>
             <textarea
               value={summaryForm.memo ?? ""}
               onChange={(event) => handleSummaryFieldChange("memo", event.target.value ? event.target.value : null)}
               rows={4}
               className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
-              placeholder="・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽﾌ・ｿｽ・ｽ・ｽ"
+              placeholder={t("fields.memoPlaceholder")}
               disabled={!canEdit}
             />
           </label>
@@ -1392,8 +1619,8 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
           <div className="rounded border border-neutral-200 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-medium text-neutral-700">Tax breakdown</h3>
-                <p className="text-xs text-neutral-500">Allocate totals by tax rate for accounting.</p>
+                <h3 className="text-sm font-medium text-neutral-700">{t("tax.title")}</h3>
+                <p className="text-xs text-neutral-500">{t("tax.subtitle")}</p>
               </div>
               <button
                 type="button"
@@ -1401,7 +1628,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                 disabled={!canEdit || !canAddAnotherLineItem}
                 className="rounded border border-neutral-300 px-3 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Add tax bucket
+                {t("tax.addBucket")}
               </button>
             </div>
             {lineItems.length ? (
@@ -1409,19 +1636,21 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                 {lineItems.map((item, index) => (
                   <div key={item.id} className="rounded border border-neutral-200 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-neutral-500">Bucket {index + 1}</span>
+                      <span className="text-xs font-medium text-neutral-500">
+                        {t("tax.bucketLabel", { index: index + 1 })}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveLineItem(item.id)}
                         disabled={!canEdit}
                         className="text-xs text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Remove
+                        {t("tax.removeBucket")}
                       </button>
                     </div>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-500">Tax rate (%)</span>
+                        <span className="text-neutral-500">{t("tax.rateLabel")}</span>
                         <input
                           type="number"
                           inputMode="decimal"
@@ -1457,13 +1686,13 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                               disabled={!canEdit}
                               className="rounded border border-neutral-200 px-2 py-0.5 text-[11px] text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              Clear
+                              {t("tax.clearRate")}
                             </button>
                           </div>
                         ) : null}
                       </label>
                       <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-500">Amount (tax included, JPY)</span>
+                        <span className="text-neutral-500">{t("tax.amountLabel")}</span>
                         <input
                           type="number"
                           inputMode="decimal"
@@ -1480,24 +1709,24 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                         />
                       </label>
                       <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-                        <span className="text-neutral-500">Description (optional)</span>
+                        <span className="text-neutral-500">{t("tax.descriptionLabel")}</span>
                         <input
                           type="text"
                           value={item.label}
                           onChange={(event) => handleLineItemChange(item.id, "label", event.target.value)}
                           className="rounded border border-neutral-300 px-3 py-2"
-                          placeholder="e.g. 10% rate items"
+                          placeholder={t("tax.descriptionPlaceholder")}
                           disabled={!canEdit}
                         />
                       </label>
                       <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-                        <span className="text-neutral-500">Memo</span>
+                        <span className="text-neutral-500">{t("tax.memoLabel")}</span>
                         <textarea
                           value={item.memo}
                           onChange={(event) => handleLineItemChange(item.id, "memo", event.target.value)}
                           rows={2}
                           className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
-                          placeholder="Optional note"
+                          placeholder={t("tax.memoPlaceholder")}
                           disabled={!canEdit}
                         />
                       </label>
@@ -1506,10 +1735,10 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
                 ))}
               </div>
             ) : (
-              <p className="mt-3 text-xs text-neutral-500">No tax buckets defined.</p>
+              <p className="mt-3 text-xs text-neutral-500">{t("tax.empty")}</p>
             )}
             {!canAddAnotherLineItem ? (
-              <p className="mt-2 text-[11px] text-neutral-400">Maximum of {maxLineItems} tax buckets reached.</p>
+              <p className="mt-2 text-[11px] text-neutral-400">{t("tax.maxReached", { count: maxLineItems })}</p>
             ) : null}
           </div>
 
@@ -1517,13 +1746,23 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-        {summaryMeta.language ? <span className="rounded bg-neutral-100 px-2 py-1">Language: {summaryMeta.language}</span> : null}
+        {summaryMeta.language ? (
+          <span className="rounded bg-neutral-100 px-2 py-1">
+            {t("meta.language", { value: summaryMeta.language })}
+          </span>
+        ) : null}
         {summaryMeta.modelVersion ? (
-          <span className="rounded bg-neutral-100 px-2 py-1">Model: {summaryMeta.modelVersion}</span>
+          <span className="rounded bg-neutral-100 px-2 py-1">
+            {t("meta.model", { value: summaryMeta.modelVersion })}
+          </span>
         ) : null}
         {usageDetails ? (
           <span className="rounded bg-neutral-100 px-2 py-1">
-            Tokens: prompt {usageDetails.prompt ?? "-"} / response {usageDetails.candidates ?? "-"} / total {usageDetails.total ?? "-"}
+            {t("meta.tokens", {
+              prompt: usageDetails.prompt ?? "-",
+              response: usageDetails.candidates ?? "-",
+              total: usageDetails.total ?? "-",
+            })}
           </span>
         ) : null}
       </div>
@@ -1540,3 +1779,4 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     </section>
   );
 }
+

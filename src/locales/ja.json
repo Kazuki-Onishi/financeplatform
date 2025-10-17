@@ -409,6 +409,138 @@
       }
     }
   },
+
+    "summaryPanel":  {
+      "summary":  {
+        "title":  "AIサマリー",
+        "subtitle":  "この領収書のOCRとGemini要約を実行します。",
+        "previewAlt":  "領収書プレビュー {label}"
+      },
+      "passbook":  {
+        "title":  "通帳OCR",
+        "subtitle":  "通帳明細のVision OCR結果。",
+        "tabs":  {
+          "image":  "通帳画像",
+          "ocr":  "OCRテキスト"
+        },
+        "columns":  {
+          "date":  "日付",
+          "description":  "摘要",
+          "withdrawal":  "出金",
+          "deposit":  "入金",
+          "balance":  "残高"
+        },
+        "actions":  {
+          "addRow":  "行を追加"
+        },
+        "hints":  {
+          "normalisation":  "保存時に日付と金額を半角に正規化します。"
+        },
+        "empty":  {
+          "noDraftRows":  "行がありません。「{action}」を押して明細を追加してください。",
+          "noEntries":  "Vision OCRで通帳明細を検出できませんでした。",
+          "noImage":  "通帳画像がありません。",
+          "noOcrText":  "OCRテキストがありません。"
+        },
+        "entries":  {
+          "noDescription":  "（摘要なし）",
+          "position":  "明細 {current}/{total}"
+        },
+        "previewAlt":  "通帳プレビュー {label}"
+      },
+      "buttons":  {
+        "processing":  "処理中...",
+        "runOcr":  "OCRを実行",
+        "saving":  "保存中...",
+        "save":  "保存",
+        "cancel":  "キャンセル",
+        "confirm":  "確認",
+        "runOcrSummarise":  "OCRと要約を実行",
+        "saveSummary":  "サマリーを保存"
+      },
+      "tabs":  {
+        "image":  "領収書画像",
+        "ocr":  "OCRテキスト"
+      },
+      "empty":  {
+        "noImage":  "領収書画像がありません。",
+        "ocrPlaceholder":  "OCRテキストがここに表示されます"
+      },
+      "alerts":  {
+        "storageUnset":  "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET が設定されていません。OCRを有効にするには設定してください。"
+      },
+      "fields":  {
+        "date":  "日付 (YYYY-MM-DD)",
+        "vendor":  "店舗名",
+        "vendorPlaceholder":  "店舗名を入力",
+        "amount":  "金額 (JPY)",
+        "taxRate":  "税率 (%)",
+        "currency":  "通貨",
+        "currencyPlaceholder":  "JPY",
+        "purpose":  "目的",
+        "purposeNone":  "目的なし",
+        "purposeHint":  "任意。後からレシートで編集できます。",
+        "purposeNote":  "目的メモ",
+        "purposeNotePlaceholder":  "簡単なメモ（任意）",
+        "purchasePurpose":  "購入目的",
+        "purchasePurposePlaceholder":  "この購入の背景（任意）",
+        "purchasePurposeHelp":  "任意。最大 {max} 文字。",
+        "advancePayment":  "立替",
+        "advanceYes":  "あり",
+        "advanceNo":  "なし",
+        "paymentMethod":  "支払方法",
+        "paymentCash":  "現金",
+        "paymentCredit":  "クレジットカード",
+        "paymentBank":  "振込",
+        "paymentOther":  "その他",
+        "cardReference":  "カード識別子",
+        "cardReferencePlaceholder":  "カードIDなど（任意）",
+        "cardReferenceHint":  "任意。カードIDや下4桁などを保存できます。",
+        "memo":  "メモ",
+        "memoPlaceholder":  "メモ（任意）"
+      },
+      "tax":  {
+        "title":  "税区分",
+        "subtitle":  "税率ごとに金額を振り分けます。",
+        "addBucket":  "税区分を追加",
+        "bucketLabel":  "区分 {index}",
+        "removeBucket":  "削除",
+        "rateLabel":  "税率 (%)",
+        "clearRate":  "クリア",
+        "amountLabel":  "税込金額 (JPY)",
+        "descriptionLabel":  "説明（任意）",
+        "descriptionPlaceholder":  "例: 10% 対象品",
+        "memoLabel":  "メモ",
+        "memoPlaceholder":  "メモ（任意）",
+        "empty":  "税区分がありません。",
+        "maxReached":  "税区分は最大 {count} 件までです。"
+      },
+      "meta":  {
+        "language":  "言語: {value}",
+        "model":  "モデル: {value}",
+        "tokens":  "トークン: プロンプト {prompt} / 応答 {response} / 合計 {total}"
+      },
+      "toasts":  {
+        "passbookNoPermission":  "通帳明細を編集する権限がありません。",
+        "passbookSaved":  "通帳明細を更新しました。",
+        "passbookSaveFailed":  "通帳明細の保存に失敗しました。",
+        "runNoPermission":  "この領収書でOCRを実行する権限がありません。",
+        "ocrRefreshed":  "OCRを更新しました。",
+        "ocrSummaryRefreshed":  "OCRとサマリーを更新しました。",
+        "runFailed":  "OCRと要約の実行に失敗しました。",
+        "summaryNoPermission":  "サマリーを保存する権限がありません。",
+        "summaryUpdated":  "サマリーを更新しました。ステータスを確認済みに戻してください。",
+        "summarySaved":  "サマリーを保存しました。",
+        "summarySaveFailed":  "サマリーの保存に失敗しました。"
+      },
+      "errors":  {
+        "storageConfig":  "ストレージの設定またはファイルパスが正しくありません。",
+        "ocrEmpty":  "OCR結果が空でした。"
+      },
+      "prompts":  {
+        "revertToReviewed":  "この領収書は確認済みです。編集するとステータスがレビュー済みに戻ります。続行しますか？"
+      }
+    },
   "dashboard": {
     "nav": {
       "receipts": "レシート",

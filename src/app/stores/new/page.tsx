@@ -11,6 +11,7 @@ import {
   upsertMembership,
   usePermissionsStore,
 } from "@/lib/state/userPermissionsStore";
+import { useTranslations } from "@/lib/i18n/I18nProvider";
 
 interface CreateStoreResponse {
   storeId: string;
@@ -50,6 +51,7 @@ const TIMEZONE_OPTIONS = [
 
 export default function CreateStorePage() {
   const router = useRouter();
+  const t = useTranslations("stores.new");
   const { confirmed } = useUserPermissions();
   const { dispatch } = usePermissionsStore();
   const [mode, setMode] = useState<"choice" | "create">("choice");
@@ -117,13 +119,13 @@ export default function CreateStorePage() {
     setInfo(null);
 
     if (!name.trim()) {
-      setError("Store name is required.");
+      setError(t("errors.nameRequired"));
       return;
     }
 
     const user = auth.currentUser;
     if (!user) {
-      setError("Please sign in before creating a store.");
+      setError(t("errors.signInRequired"));
       return;
     }
 
@@ -152,14 +154,16 @@ export default function CreateStorePage() {
 
       const payloadObj = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
       if (!response.ok || !payloadObj || !isCreateStoreResponse(payloadObj)) {
-        const message = typeof (payloadObj as Record<string, unknown> | null)?.message === "string"
-          ? (payloadObj as Record<string, unknown>).message
-          : undefined;
-        const errorMsg = typeof (payloadObj as Record<string, unknown> | null)?.error === "string"
-          ? (payloadObj as Record<string, unknown>).error
-          : undefined;
-        const msg = (message as string | undefined) || (errorMsg as string | undefined) || `Failed to create store. status=${response.status}`;
-        setError(msg);
+        const message =
+          typeof (payloadObj as Record<string, unknown> | null)?.message === "string"
+            ? ((payloadObj as Record<string, unknown>).message as string)
+            : undefined;
+        const errorMsg =
+          typeof (payloadObj as Record<string, unknown> | null)?.error === "string"
+            ? ((payloadObj as Record<string, unknown>).error as string)
+            : undefined;
+        const fallbackMessage = t("errors.createFailed", { status: response.status });
+        setError(message ?? errorMsg ?? fallbackMessage);
         return;
       }
 
@@ -192,14 +196,14 @@ export default function CreateStorePage() {
         }),
       );
 
-      setInfo("Store created. Redirecting to upload...");
+      setInfo(t("status.created"));
       setSyncStartedAt(Date.now());
       setSyncExceeded(false);
 
       router.replace(`/dashboard/upload?store=${encodeURIComponent(storeId)}&joined=1`);
     } catch (err) {
       console.error("[create-store] network error", err);
-      setError("Network error while creating the store.");
+      setError(t("errors.network"));
     } finally {
       setSubmitting(false);
     }
@@ -209,8 +213,8 @@ export default function CreateStorePage() {
     return (
       <div className="mx-auto flex min-h-[70vh] w-full max-w-2xl flex-col gap-6 px-6 py-10">
         <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold">Get started with stores</h1>
-          <p className="text-sm text-neutral-500">Choose whether to join an existing store or create a new one.</p>
+          <h1 className="text-2xl font-semibold">{t("choice.title")}</h1>
+          <p className="text-sm text-neutral-500">{t("choice.description")}</p>
         </header>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -219,16 +223,16 @@ export default function CreateStorePage() {
             onClick={() => router.push("/onboarding?intent=join")}
             className="flex flex-col gap-2 rounded border border-neutral-200 p-4 text-left text-sm font-medium text-blue-600 hover:border-blue-400 hover:bg-blue-50"
           >
-            <span className="text-base font-semibold text-blue-700">Join a store</span>
-            <span className="text-xs font-normal text-neutral-500">Enter an invite code from a teammate and get access quickly.</span>
+            <span className="text-base font-semibold text-blue-700">{t("choice.joinTitle")}</span>
+            <span className="text-xs font-normal text-neutral-500">{t("choice.joinDescription")}</span>
           </button>
           <button
             type="button"
             onClick={() => setMode("create")}
             className="flex flex-col gap-2 rounded border border-neutral-200 p-4 text-left text-sm font-medium text-green-600 hover:border-green-400 hover:bg-green-50"
           >
-            <span className="text-base font-semibold text-green-700">Create a store</span>
-            <span className="text-xs font-normal text-neutral-500">Start fresh, then invite teammates once everything is ready.</span>
+            <span className="text-base font-semibold text-green-700">{t("choice.createTitle")}</span>
+            <span className="text-xs font-normal text-neutral-500">{t("choice.createDescription")}</span>
           </button>
         </div>
       </div>
@@ -238,17 +242,17 @@ export default function CreateStorePage() {
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-2xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Create a new store</h1>
-        <p className="text-sm text-neutral-500">Enter store information to start uploading receipts instantly.</p>
+        <h1 className="text-2xl font-semibold">{t("form.title")}</h1>
+        <p className="text-sm text-neutral-500">{t("form.description")}</p>
       </header>
 
       <form className="flex flex-col gap-4 rounded border border-neutral-200 p-4" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-sm" htmlFor="store-name">
-          <span className="font-medium">Store name</span>
+          <span className="font-medium">{t("form.nameLabel")}</span>
           <input
             id="store-name"
             className="rounded border border-neutral-300 px-3 py-2"
-            placeholder="Example Store"
+            placeholder={t("form.namePlaceholder")}
             value={name}
             onChange={(event) => setName(event.target.value)}
             disabled={submitting}
@@ -256,7 +260,7 @@ export default function CreateStorePage() {
         </label>
 
         <label className="flex flex-col gap-1 text-sm" htmlFor="store-currency">
-          <span className="font-medium">Currency</span>
+          <span className="font-medium">{t("form.currencyLabel")}</span>
           <select
             id="store-currency"
             className="rounded border border-neutral-300 px-3 py-2 uppercase"
@@ -273,7 +277,7 @@ export default function CreateStorePage() {
         </label>
 
         <label className="flex flex-col gap-1 text-sm" htmlFor="store-timezone">
-          <span className="font-medium">Timezone</span>
+          <span className="font-medium">{t("form.timezoneLabel")}</span>
           <select
             id="store-timezone"
             className="rounded border border-neutral-300 px-3 py-2"
@@ -295,7 +299,7 @@ export default function CreateStorePage() {
             disabled={submitting}
             className="inline-flex items-center rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? "Creating..." : "Create store"}
+            {submitting ? t("form.submitting") : t("form.submit")}
           </button>
           <button
             type="button"
@@ -303,17 +307,17 @@ export default function CreateStorePage() {
             disabled={submitting}
             className="inline-flex items-center rounded border border-neutral-300 px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100"
           >
-            Back
+            {t("form.back")}
           </button>
         </div>
       </form>
 
       {isSyncing ? (
         <div className="flex items-center gap-2 text-xs text-neutral-500" aria-live="polite">
-          <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-700">\u540C\u671F\u4E2D\u2026</span>
+          <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-700">{t("form.syncing")}</span>
           {syncExceeded ? (
             <button type="button" className="text-blue-600 underline" onClick={() => router.refresh()}>
-              \u518D\u8AAD\u307F\u8FBC\u307F
+              {t("form.reload")}
             </button>
           ) : null}
         </div>

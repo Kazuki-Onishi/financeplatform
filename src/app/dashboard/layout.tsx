@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { AVAILABLE_LOCALES, isLocale } from "@/lib/i18n";
 import { useLocale, useTranslations } from "@/lib/i18n/I18nProvider";
+import { DashboardPermissionsProvider } from "./PermissionsProvider";
 
 const NAV_ITEMS: Array<{ href: string; labelKey: string }> = [
   { href: "/dashboard/receipts", labelKey: "receipts" },
@@ -65,8 +66,9 @@ export default function DashboardLayout({
   const tNav = useTranslations("dashboard.nav");
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
+    <DashboardPermissionsProvider>
+      <div className="min-h-screen bg-neutral-50 text-neutral-900">
+        <header className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link href="/dashboard/receipts" className="text-lg font-semibold text-neutral-900">
             Kazuki Finance
@@ -92,8 +94,15 @@ export default function DashboardLayout({
             <LocaleSwitcher />
           </div>
         </div>
-      </header>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6">{children}</main>
+        </header>
+        <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6">{children}</main>
     </div>
+    </DashboardPermissionsProvider>
   );
 }
+
+
+
+
+
+

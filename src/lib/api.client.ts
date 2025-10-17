@@ -1,4 +1,5 @@
 ﻿import { auth } from "@/lib/firebase/client";
+import { fetchWithApiCache, invalidateApiCache, peekApiCacheValue } from "./apiCache";
 
 export type OcrMode = "document" | "text" | "label";
 
@@ -34,6 +35,29 @@ async function assertOk(response: Response): Promise<void> {
   throw new Error(message || `Request failed (${response.status})`);
 }
 
+
+const ADMIN_MEMBERS_CACHE_KEY = "adminMembers";
+const STORE_INVITES_CACHE_PREFIX = "storeInvites:";
+
+function storeInvitesCacheKey(storeId: string): string {
+  return `${STORE_INVITES_CACHE_PREFIX}${storeId}`;
+}
+
+export function peekCachedAdminMembers(): AdminMembersResponse | undefined {
+  return peekApiCacheValue<AdminMembersResponse>(ADMIN_MEMBERS_CACHE_KEY);
+}
+
+export function invalidateAdminMembersCache(): void {
+  invalidateApiCache(ADMIN_MEMBERS_CACHE_KEY);
+}
+
+export function peekCachedStoreInvites(storeId: string): StoreInviteRecord[] | undefined {
+  return peekApiCacheValue<StoreInviteRecord[]>(storeInvitesCacheKey(storeId));
+}
+
+export function invalidateStoreInvitesCache(storeId: string): void {
+  invalidateApiCache(storeInvitesCacheKey(storeId));
+}
 export async function callOCR(
   gcsUri: string,
   mode: OcrMode = "document",
@@ -91,19 +115,27 @@ export interface AdminMembersResponse {
   members: AdminMemberRecord[];
 }
 
-export async function fetchAdminMembers(): Promise<AdminMembersResponse> {
+export async function fetchAdminMembers(
+  options?: { force?: boolean; ttlMs?: number },
+): Promise<AdminMembersResponse> {
   const user = auth.currentUser;
   if (!user) {
     throw new Error("signin required");
   }
-  const idToken = await user.getIdToken();
-  const response = await fetch("/api/admin/members", {
-    headers: {
-      Authorization: `Bearer ${idToken}`,
+  return fetchWithApiCache(
+    ADMIN_MEMBERS_CACHE_KEY,
+    async () => {
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/admin/members", {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      await assertOk(response);
+      return (await response.json()) as AdminMembersResponse;
     },
-  });
-  await assertOk(response);
-  return (await response.json()) as AdminMembersResponse;
+    options,
+  );
 }
 
 export async function updateStoreMember(
@@ -128,6 +160,7 @@ export async function updateStoreMember(
     },
   );
   await assertOk(response);
+  invalidateAdminMembersCache();
 }
 
 export interface StoreInviteRecord {
@@ -156,20 +189,30 @@ export interface CreateInvitePayload {
   targetUserId?: string | null;
 }
 
-export async function fetchStoreInvites(storeId: string): Promise<StoreInviteRecord[]> {
+export async function fetchStoreInvites(
+  storeId: string,
+  options?: { force?: boolean; ttlMs?: number },
+): Promise<StoreInviteRecord[]> {
   const user = auth.currentUser;
   if (!user) {
     throw new Error("signin required");
   }
-  const idToken = await user.getIdToken();
-  const response = await fetch(`/api/stores/${encodeURIComponent(storeId)}/invites`, {
-    headers: {
-      Authorization: `Bearer ${idToken}`,
+  const cacheKey = storeInvitesCacheKey(storeId);
+  return fetchWithApiCache(
+    cacheKey,
+    async () => {
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/stores/${encodeURIComponent(storeId)}/invites`, {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      await assertOk(response);
+      const data = await response.json();
+      return Array.isArray(data?.invites) ? (data.invites as StoreInviteRecord[]) : [];
     },
-  });
-  await assertOk(response);
-  const data = await response.json();
-  return Array.isArray(data?.invites) ? (data.invites as StoreInviteRecord[]) : [];
+    options,
+  );
 }
 
 export async function createStoreInvite(
@@ -191,6 +234,7 @@ export async function createStoreInvite(
   });
   await assertOk(response);
   const data = await response.json();
+  invalidateStoreInvitesCache(storeId);
   return {
     id: data.id,
     code: data.code,
@@ -225,6 +269,7 @@ export async function revokeStoreInvite(storeId: string, inviteId: string): Prom
     },
   );
   await assertOk(response);
+  invalidateStoreInvitesCache(storeId);
 }
 
 export interface BulkAnalysisResult {
@@ -252,3 +297,10 @@ export async function runBulkAnalysis(receiptIds: string[]): Promise<BulkAnalysi
   await assertOk(response);
   return (await response.json()) as BulkAnalysisResult;
 }
+
+
+
+
+
+
+

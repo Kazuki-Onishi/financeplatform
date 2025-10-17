@@ -59,17 +59,32 @@ export default function SettingsPage() {
     };
   }, []);
 
-  const storeOptions: StoreOption[] = useMemo(
-    () => state.stores.map((store) => ({ id: store.id, name: store.name })),
-    [state.stores],
-  );
-
-  const storeIds = useMemo(() => state.stores.map((store) => store.id), [state.stores]);
+  const sortedStoreOptions: StoreOption[] = useMemo(() => {
+    const options = state.stores.map((store) => ({
+      id: store.id,
+      name: store.name,
+    }));
+    return options.sort((a, b) => a.name.localeCompare(b.name, "ja"));
+  }, [state.stores]);
 
   const selectedStoreName = useMemo(
-    () => storeOptions.find((store) => store.id === selectedStoreId)?.name ?? "-",
-    [storeOptions, selectedStoreId],
+    () => sortedStoreOptions.find((store) => store.id === selectedStoreId)?.name ?? "-",
+    [sortedStoreOptions, selectedStoreId],
   );
+
+  const displayStoreOptions: StoreOption[] = useMemo(() => {
+    if (!selectedStoreId) {
+      return sortedStoreOptions;
+    }
+    const selected = sortedStoreOptions.find((option) => option.id === selectedStoreId);
+    if (!selected) {
+      return sortedStoreOptions;
+    }
+    const remaining = sortedStoreOptions.filter((option) => option.id !== selectedStoreId);
+    return [{ ...selected, name: `★ ${selected.name}` }, ...remaining];
+  }, [sortedStoreOptions, selectedStoreId]);
+
+  const storeIds = useMemo(() => displayStoreOptions.map((option) => option.id), [displayStoreOptions]);
 
   const pushToast = useCallback((type: ToastMessage["type"], message: string) => {
     setToasts((prev) => {
@@ -165,14 +180,14 @@ export default function SettingsPage() {
       <CardsPanel
         canManage
         storeIds={storeIds}
-        storeOptions={storeOptions}
+        storeOptions={displayStoreOptions}
         selectedStoreId={selectedStoreId || null}
         selectedStoreName={selectedStoreName}
         pushToast={pushToast}
         loadingPermissions={false}
       />
       <AdminMembersPanel
-        stores={state.stores}
+        stores={displayStoreOptions}
         members={state.members}
         selectedStoreId={selectedStoreId}
         onSelectStore={handleSelectStore}
@@ -182,7 +197,7 @@ export default function SettingsPage() {
         error={error}
       />
       <AdminInviteManager
-        stores={state.stores}
+        stores={displayStoreOptions}
         selectedStoreId={selectedStoreId}
         onSelectStore={handleSelectStore}
       />

@@ -144,6 +144,20 @@ export async function POST(request: NextRequest): Promise<Response> {
       const shouldActivateMembership = !currentMember || currentMember.status !== "active";
       const joinedAt = FieldValue.serverTimestamp();
 
+      const userPermRef = adminDb.collection("userPermissions").doc(decodedToken.uid);
+      const userPermSnap = await transaction.get(userPermRef);
+      const existingPerms = userPermSnap.exists ? (userPermSnap.data() as UserPermissionsDoc) : null;
+      const nextStoreIds = mergeUnique([...(existingPerms?.storeIds ?? []), storeRef.id]);
+      const nextFlags = mergeUnique([...(existingPerms?.flags ?? []), ...combinedMemberFlags]);
+
+      const userPermUpdate: Record<string, unknown> = {
+        storeIds: FieldValue.arrayUnion(storeRef.id),
+        activeStoreId: storeRef.id,
+      };
+      if (combinedMemberFlags.length) {
+        userPermUpdate.flags = FieldValue.arrayUnion(...combinedMemberFlags);
+      }
+
       transaction.set(
         memberRef,
         {
@@ -165,20 +179,6 @@ export async function POST(request: NextRequest): Promise<Response> {
           status: nextStatus,
           lastAcceptedAt: joinedAt,
         });
-      }
-
-      const userPermRef = adminDb.collection("userPermissions").doc(decodedToken.uid);
-      const userPermSnap = await transaction.get(userPermRef);
-      const existingPerms = userPermSnap.exists ? (userPermSnap.data() as UserPermissionsDoc) : null;
-      const nextStoreIds = mergeUnique([...(existingPerms?.storeIds ?? []), storeRef.id]);
-      const nextFlags = mergeUnique([...(existingPerms?.flags ?? []), ...combinedMemberFlags]);
-
-      const userPermUpdate: Record<string, unknown> = {
-        storeIds: FieldValue.arrayUnion(storeRef.id),
-        activeStoreId: storeRef.id,
-      };
-      if (combinedMemberFlags.length) {
-        userPermUpdate.flags = FieldValue.arrayUnion(...combinedMemberFlags);
       }
 
       transaction.set(userPermRef, userPermUpdate, { merge: true });

@@ -15,7 +15,7 @@ import {
 
 import { db } from "@/lib/firebase/client";
 import { toIsoDate } from "@/lib/ocrPassbook";
-import { useUserPermissions } from "@/lib/hooks/useUserPermissions";
+import { useDashboardPermissions } from "../PermissionsProvider";
 import type { ReceiptPassbookEntry } from "@/types/receipt";
 
 function formatPassbookNumber(value: number | null): string {
@@ -139,7 +139,7 @@ function formatCsvValue(value: string | number | null | undefined): string {
 }
 
 export default function PassbooksPage() {
-  const { permissions, loading: permissionsLoading } = useUserPermissions();
+  const { permissions, loading: permissionsLoading } = useDashboardPermissions();
 
   const storeOptions = useMemo(() => {
     const ids = permissions?.storeIds ?? [];
@@ -498,7 +498,7 @@ export default function PassbooksPage() {
                 <th className="p-3 text-left">摘要</th>
                 <th className="p-3 text-right whitespace-nowrap">お支払金額</th>
                 <th className="p-3 text-right whitespace-nowrap">お預り金額</th>
-                <th className="p-3 text-right whitespace-nowrap">差引残高</th>
+                <th className="p-3 text-right whitespace-nowrap">残高</th>
               </tr>
             </thead>
             <tbody>
@@ -594,6 +594,7 @@ export default function PassbooksPage() {
     </div>
   );
 }
+
 
 
 

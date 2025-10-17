@@ -46,3 +46,6 @@ vision-invoker-key.json
 # もしくは全般的に *.json 鍵を除外するなら
 /*.json
 !src/locales/*.json
+
+# Local Netlify folder
+.netlify
