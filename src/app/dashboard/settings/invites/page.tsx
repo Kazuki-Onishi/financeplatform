@@ -73,12 +73,16 @@ const FLAG_VALUES: PermissionFlag[] = [
 const EXPIRES_VALUES = ["7", "30", "90", "0"] as const;
 
 function mapInviteRecord(record: StoreInviteRecord): InviteListItem {
+  const rawFlags = Array.isArray(record.flags) ? record.flags : [];
+  const filteredFlags = rawFlags.filter((flag): flag is PermissionFlag =>
+    FLAG_VALUES.includes(flag as PermissionFlag),
+  );
   return {
     id: record.id,
     code: record.code ?? "",
     link: record.link ?? "",
     role: (record.role as StoreMemberRole) ?? "staff",
-    flags: Array.isArray(record.flags) ? record.flags : [],
+    flags: filteredFlags,
     status: record.status ?? "active",
     used: record.used ?? 0,
     maxUses: record.maxUses ?? 0,

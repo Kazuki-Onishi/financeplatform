@@ -65,11 +65,15 @@ interface MemberFormState {
 }
 
 function mapInviteRecord(record: StoreInviteRecord): InviteRow {
+  const rawFlags = Array.isArray(record.flags) ? record.flags : [];
+  const filteredFlags = rawFlags.filter((flag): flag is PermissionFlag =>
+    FLAG_LABELS.some((entry) => entry.value === flag),
+  );
   return {
     id: record.id,
     code: record.code ?? "",
     role: (record.role as StoreMemberRole) ?? "staff",
-    flags: Array.isArray(record.flags) ? (record.flags as PermissionFlag[]) : [],
+    flags: filteredFlags,
     status: record.status ?? "active",
     maxUses: record.maxUses ?? 0,
     used: record.used ?? 0,
