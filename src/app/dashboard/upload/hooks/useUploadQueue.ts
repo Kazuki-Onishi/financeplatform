@@ -471,19 +471,20 @@ export function useUploadQueue({
   const handleCapture = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const filesList = event.target.files;
+      const filesArray = filesList ? Array.from(filesList) : [];
       event.target.value = "";
-      if (!filesList || !filesList.length) {
+      if (!filesArray.length) {
         return;
       }
       const enqueueContext = buildEnqueueContext();
       const { trimmed: purchasePurposeValue } = getPurchasePurpose();
       const paymentContext = getPaymentMethodContext();
-      const fileDetails = Array.from(filesList).map((file) => ({ name: file.name, type: file.type, size: file.size }));
+      const fileDetails = filesArray.map((file) => ({ name: file.name, type: file.type, size: file.size }));
 
       console.info("[upload] capture: incoming", {
         disabled: featureDisabled,
         storeId,
-        count: filesList.length,
+        count: filesArray.length,
         types: fileDetails,
         purpose_key: enqueueContext.purposeKey,
         purpose_note_len_bucket: enqueueContext.purposeBucket,
@@ -503,7 +504,7 @@ export function useUploadQueue({
         return;
       }
 
-      enqueueFiles(filesList, "capture", enqueueContext);
+      enqueueFiles(filesArray, "capture", enqueueContext);
     },
     [
       addToast,
