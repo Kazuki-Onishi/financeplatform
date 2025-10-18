@@ -9,6 +9,13 @@ import {
   type FormEvent,
 } from "react";
 import { auth } from "@/lib/firebase/client";
+import {
+  createStoreInvite,
+  fetchStoreInvites,
+  peekCachedStoreInvites,
+  revokeStoreInvite,
+  type StoreInviteRecord,
+} from "@/lib/api.client";
 import type { PermissionFlag } from "@/types/permissions";
 import type { StoreMemberRole } from "@/types/store";
 import type { ToastMessage } from "../types";
@@ -55,6 +62,25 @@ interface MemberFormState {
   flags: PermissionFlag[];
   status: "active" | "pending";
   resigned: boolean;
+}
+
+function mapInviteRecord(record: StoreInviteRecord): InviteRow {
+  return {
+    id: record.id,
+    code: record.code ?? "",
+    role: (record.role as StoreMemberRole) ?? "staff",
+    flags: Array.isArray(record.flags) ? (record.flags as PermissionFlag[]) : [],
+    status: record.status ?? "active",
+    maxUses: record.maxUses ?? 0,
+    used: record.used ?? 0,
+    note: record.note ?? null,
+    link: record.link ?? "",
+    createdAt: record.createdAt ?? null,
+    expiresAt: record.expiresAt ?? null,
+    targetUserId: record.targetUserId ?? null,
+    targetEmail: record.targetEmail ?? null,
+    targetDisplayName: record.targetDisplayName ?? null,
+  };
 }
 
 const MEMBER_ROLE_LABELS: Record<StoreMemberRole, string> = {
