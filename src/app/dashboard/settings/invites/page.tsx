@@ -208,9 +208,7 @@ export default function SettingsInvitesPage() {
     setSelectedStoreId((current) => (current && storeIds.includes(current) ? current : storeIds[0]));
   }, [storeIds]);
 
-  const matchedStore = selectedStoreId ? stores.find((store) => store.id === selectedStoreId) : null;
-  const storeName = matchedStore ? matchedStore.name.replace(/^笘・s*/, "") : selectedStoreId ?? "";
-  const storeDisplayName = storeName || t("storePicker.none");
+  const storeDisplayName = selectedStoreId || t("storePicker.none");
 
   const handleLoadInvites = useCallback(
     async (storeId: string, force = false) => {
