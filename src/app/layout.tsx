@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 
-import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/i18n";
 import { AppProviders } from "./providers";
 import "./globals.css";
 
@@ -19,7 +19,21 @@ export default async function RootLayout({
   const cookieStore = await cookies();
   const activeStoreId = cookieStore.get("activeStoreId")?.value ?? null;
   const localeCookie = cookieStore.get("locale")?.value ?? null;
-  const locale = isLocale(localeCookie) ? localeCookie : DEFAULT_LOCALE;
+
+  let locale: Locale = DEFAULT_LOCALE;
+  if (localeCookie && isLocale(localeCookie)) {
+    locale = localeCookie;
+  } else {
+    try {
+      cookieStore.set("locale", DEFAULT_LOCALE, {
+        path: "/",
+        httpOnly: false,
+        sameSite: "lax",
+      });
+    } catch {
+      // ignore failures to persist locale cookie
+    }
+  }
 
   return (
     <html lang={locale}>
