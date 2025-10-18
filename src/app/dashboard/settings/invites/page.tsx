@@ -293,14 +293,15 @@ export default function SettingsInvitesPage() {
       setUserSearchError(null);
       return;
     }
-    if (!auth.currentUser) {
+    const authUser = auth.currentUser;
+    if (!authUser) {
       pushToast("error", t("errors.signIn"));
       return;
     }
     setSearchingUsers(true);
     setUserSearchError(null);
     try {
-      const idToken = await user.getIdToken();
+      const idToken = await authUser.getIdToken();
       const params = new URLSearchParams({ query, limit: "10" });
       const response = await fetch(
         `/api/stores/${encodeURIComponent(storeId)}/invites/search?${params.toString()}`,
