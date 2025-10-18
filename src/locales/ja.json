@@ -205,20 +205,164 @@
       "delete": "取引先を削除"
     },
     "invites": {
-      "title": "チーム招待",
-      "selectStore": "店舗を選択",
-      "createButton": "招待リンクを作成",
-      "refresh": "更新",
-      "empty": "まだ招待がありません。",
-      "copyLink": "リンクをコピー",
-      "openLink": "リンクを開く",
-      "revoke": "招待を取り消す",
-      "statuses": {
-        "active": "有効",
-        "revoked": "無効"
+      "page": {
+        "title": "チーム招待",
+        "description": "チームメイト向けに招待リンクを発行します。リンクを受け取ったユーザーは、指定したロールと権限で参加できます。",
+        "permissionHint": "招待機能を利用するには、オーナーまたは管理権限を含むロールが必要です。"
+      },
+      "noStores": "招待を管理できる店舗がありません。店舗を作成するか、既存の店舗に招待を受けてください。",
+      "storePicker": {
+        "label": "店舗",
+        "selectedLabel": "選択中の店舗:",
+        "none": "未選択"
+      },
+      "form": {
+        "title": "招待を作成",
+        "roleLabel": "ロール",
+        "maxUsesLabel": "利用可能回数",
+        "maxUsesHint": "0 を指定すると無制限になります。",
+        "expiresLabel": "有効期限",
+        "noteLabel": "メモ（任意）",
+        "notePlaceholder": "管理者向けのメモを入力できます。",
+        "flagsLabel": "追加権限",
+        "submit": "招待を作成",
+        "submitting": "作成中...",
+        "reset": "リセット"
+      },
+      "expires": {
+        "7": "7 日",
+        "30": "30 日",
+        "90": "90 日",
+        "0": "期限なし"
+      },
+      "roles": {
+        "owner": {
+          "label": "オーナー",
+          "description": "すべての操作が可能です。招待も作成できます。"
+        },
+        "manager": {
+          "label": "マネージャー",
+          "description": "アップロードやカード／ベンダー管理などが可能です。"
+        },
+        "staff": {
+          "label": "スタッフ",
+          "description": "レシートのアップロードと編集が可能です。"
+        },
+        "viewer": {
+          "label": "閲覧者",
+          "description": "閲覧のみ可能です。"
+        }
+      },
+      "flags": {
+        "perm.upload": {
+          "label": "アップロード",
+          "description": "レシートのアップロードを許可します。"
+        },
+        "perm.editFields": {
+          "label": "編集",
+          "description": "レシートの編集を許可します。"
+        },
+        "perm.view": {
+          "label": "閲覧",
+          "description": "レシートの閲覧を許可します。"
+        },
+        "perm.exportCsv": {
+          "label": "CSV 書き出し",
+          "description": "CSV エクスポートを許可します。"
+        },
+        "perm.lock": {
+          "label": "ロック",
+          "description": "レシートのロックを許可します。"
+        },
+        "perm.unlock": {
+          "label": "ロック解除",
+          "description": "レシートのロック解除を許可します。"
+        },
+        "perm.manageCards": {
+          "label": "カード管理",
+          "description": "支払いカードの管理を許可します。"
+        },
+        "perm.manageVendors": {
+          "label": "ベンダー管理",
+          "description": "ベンダーカタログの管理を許可します。"
+        },
+        "perm.manageMembers": {
+          "label": "メンバー管理",
+          "description": "メンバーの招待やロール更新を許可します。"
+        }
+      },
+      "errors": {
+        "loadInvites": "招待の読み込みに失敗しました。",
+        "noPermission": "この店舗の招待を管理する権限がありません。",
+        "selectStore": "先に店舗を選択してください。",
+        "signIn": "招待を管理するにはサインインしてください。",
+        "searchUsers": "ユーザーの検索に失敗しました。",
+        "searchUsersNetwork": "ユーザー検索中にネットワークエラーが発生しました。",
+        "createInvite": "招待の作成中にエラーが発生しました。",
+        "copyLink": "リンクのコピーに失敗しました。",
+        "revokeInvite": "招待の無効化中にエラーが発生しました。"
+      },
+      "toasts": {
+        "directInviteSent": "{recipient} さんへ招待を送信しました。",
+        "createSuccess": "招待を作成しました。",
+        "copySuccess": "招待リンクをコピーしました。",
+        "copyFallback": "このリンクをコピーしてください: {link}",
+        "revokeSuccess": "招待を無効化しました。"
+      },
+      "confirm": {
+        "revoke": "この招待を無効化しますか？以降はリンクから参加できなくなります。"
+      },
+      "direct": {
+        "title": "既存ユーザーを招待",
+        "description": "既存アカウントを検索して、ワンタイム招待を送信します。",
+        "searchLabel": "ユーザー検索",
+        "searchPlaceholder": "メールアドレス、名前、またはユーザーIDで検索",
+        "searching": "検索中...",
+        "searchButton": "検索",
+        "clear": "クリア",
+        "roleLabel": "ロール",
+        "flagsLabel": "追加権限",
+        "status": {
+          "searching": "ユーザーを検索しています...",
+          "hint": "メールアドレスまたは名前を入力して検索してください。"
+        },
+        "userStatus": {
+          "available": "招待可能",
+          "member": "既にメンバーです",
+          "invited": "招待済みです",
+          "emailUnknown": "メールアドレス不明"
+        },
+        "sendInvite": "招待を送信",
+        "sendInviteSending": "送信中..."
+      },
+      "list": {
+        "title": "招待一覧",
+        "description": "{store} の最新 50 件の招待が表示されます。",
+        "refresh": "更新",
+        "refreshing": "更新中...",
+        "empty": "招待はまだありません。",
+        "status": {
+          "active": "有効",
+          "revoked": "無効",
+          "consumed": "使用済み",
+          "pending": "承認待ち",
+          "expired": "期限切れ"
+        },
+        "uses": "利用状況: {used}/{max}",
+        "usesUnlimited": "利用状況: {used}/無制限",
+        "noFlags": "追加の権限は付与されていません。",
+        "directFor": "{recipient} 用の直接招待",
+        "note": "メモ: {note}",
+        "created": "作成日時: {date}",
+        "expires": "有効期限: {date}",
+        "noExpiry": "有効期限なし",
+        "copyLink": "リンクをコピー",
+        "openLink": "リンクを開く",
+        "revoke": "招待を無効化",
+        "revoking": "無効化中...",
+        "loading": "招待を読み込み中..."
       }
-    }
-  },
+    }  },
   "receipts": {
     "detail": {
       "title": "レシート詳細",
