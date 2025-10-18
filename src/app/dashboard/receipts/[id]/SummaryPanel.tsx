@@ -421,7 +421,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     } finally {
       setPassbookSaving(false);
     }
-  }, [canEdit, onReceiptUpdate, passbookDraft, pushToast, receipt.id]);
+  }, [canEdit, onReceiptUpdate, passbookDraft, pushToast, receipt.id, t]);
 
   useEffect(() => {
     const nextSummary = receipt.summary ?? null;
@@ -793,6 +793,12 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
 
       const summaryResult = await callSummarize(text);
       setSummaryForm((prev) => {
+        const summaryExtras = summaryResult.summary as {
+          purchasePurpose?: unknown;
+          advancePayment?: unknown;
+        };
+        const summaryPurchaseRaw = summaryExtras.purchasePurpose;
+        const summaryAdvanceRaw = summaryExtras.advancePayment;
         const resultAmount =
           typeof summaryResult.summary.amount === "number" && Number.isFinite(summaryResult.summary.amount)
             ? summaryResult.summary.amount
@@ -819,13 +825,12 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
           currency: summaryResult.summary.currency ?? "JPY",
           memo: summaryResult.summary.memo ?? null,
           purchasePurpose:
-            typeof summaryResult.summary.purchasePurpose === "string" &&
-            summaryResult.summary.purchasePurpose.length
-              ? summaryResult.summary.purchasePurpose.slice(0, PURCHASE_PURPOSE_MAX_LENGTH)
+            typeof summaryPurchaseRaw === "string" && summaryPurchaseRaw.length
+              ? summaryPurchaseRaw.slice(0, PURCHASE_PURPOSE_MAX_LENGTH)
               : prev.purchasePurpose,
           advancePayment:
-            typeof summaryResult.summary.advancePayment === "boolean"
-              ? summaryResult.summary.advancePayment
+            typeof summaryAdvanceRaw === "boolean"
+              ? summaryAdvanceRaw
               : prev.advancePayment,
         };
       });
@@ -845,7 +850,7 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     } finally {
       setLoading(false);
     }
-  }, [canEdit, onReceiptUpdate, pushToast, receipt, summariesEnabled]);
+  }, [canEdit, onReceiptUpdate, pushToast, receipt, summariesEnabled, t]);
 
   const handleSave = useCallback(async () => {
     if (!canEdit) {
@@ -996,7 +1001,21 @@ export default function SummaryPanel({ receipt, canEdit, pushToast, onReceiptUpd
     } finally {
       setSaving(false);
     }
-  }, [canEdit, keywords, latestOcr, onReceiptUpdate, ocrPreview, pushToast, receipt, summaryDirty, summaryForm, summaryMeta]);
+  }, [
+    canEdit,
+    keywords,
+    latestOcr,
+    onReceiptUpdate,
+    ocrPreview,
+    paymentMethodCardId,
+    paymentMethodType,
+    pushToast,
+    receipt,
+    summaryDirty,
+    summaryForm,
+    summaryMeta,
+    t,
+  ]);
 
   const disableRun = !canEdit || loading || saving || passbookSaving || editingPassbook;
   const disableSave = !canEdit || saving;

@@ -206,16 +206,8 @@ export default function SettingsInvitesPage() {
     setSelectedStoreId((current) => (current && storeIds.includes(current) ? current : storeIds[0]));
   }, [storeIds]);
 
-  const storeName = useMemo(() => {
-    if (!selectedStoreId) {
-      return "";
-    }
-    const match = stores.find((store) => store.id === selectedStoreId);
-    if (!match) {
-      return selectedStoreId;
-    }
-    return match.name.replace(/^★\s*/, "");
-  }, [selectedStoreId, stores]);
+  const matchedStore = selectedStoreId ? stores.find((store) => store.id === selectedStoreId) : null;
+  const storeName = matchedStore ? matchedStore.name.replace(/^笘・s*/, "") : selectedStoreId ?? "";
   const storeDisplayName = storeName || t("storePicker.none");
 
   const handleLoadInvites = useCallback(
@@ -256,7 +248,7 @@ export default function SettingsInvitesPage() {
         setInvitesLoading(false);
       }
     },
-    [pushToast],
+    [pushToast, t],
   );
 
   useEffect(() => {
@@ -333,7 +325,7 @@ export default function SettingsInvitesPage() {
     } finally {
       setSearchingUsers(false);
     }
-  }, [pushToast, selectedStoreId, userSearchQuery]);
+  }, [pushToast, selectedStoreId, t, userSearchQuery]);
 
   const handleClearUserSearch = useCallback(() => {
     setUserSearchResults([]);
@@ -376,7 +368,7 @@ export default function SettingsInvitesPage() {
         setDirectInviteSending(null);
       }
     },
-    [directInviteFlags, directInviteRole, handleLoadInvites, pushToast, selectedStoreId],
+    [directInviteFlags, directInviteRole, handleLoadInvites, pushToast, selectedStoreId, t],
   );
 
   const handleCreateInvite = useCallback(async () => {
@@ -429,7 +421,7 @@ export default function SettingsInvitesPage() {
     } finally {
       setCreating(false);
     }
-  }, [formState, handleLoadInvites, pushToast, selectedStoreId]);
+  }, [formState, handleLoadInvites, pushToast, selectedStoreId, t]);
 
   const handleCopyLink = useCallback((invite: InviteListItem) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -442,7 +434,7 @@ export default function SettingsInvitesPage() {
     } else {
       pushToast("info", t("toasts.copyFallback", { link: fullLink }));
     }
-  }, [pushToast]);
+  }, [pushToast, t]);
 
   const handleRevoke = useCallback(
     async (invite: InviteListItem) => {
@@ -470,7 +462,7 @@ export default function SettingsInvitesPage() {
         setRevokingId(null);
       }
     },
-    [handleLoadInvites, pushToast, selectedStoreId],
+    [handleLoadInvites, pushToast, selectedStoreId, t],
   );
 
   const hasStores = storeIds.length > 0;
@@ -799,7 +791,6 @@ export default function SettingsInvitesPage() {
             {invites.map((invite) => {
               const statusLabel = t(`list.status.${invite.status}` as const, { defaultValue: invite.status });
               const roleLabel = roleLabelMap.get(invite.role)?.label ?? invite.role;
-              const flagLabels = invite.flags.map((flag) => flagLabelMap.get(flag) ?? flag);
               const usesLabel =
                 invite.maxUses === 0
                   ? t("list.usesUnlimited", { used: invite.used })
