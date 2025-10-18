@@ -3,7 +3,6 @@
 import { NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "../../../../../../lib/firebase/admin";
-import { upsertUserStoreRoleFromMember } from "../../../../../../lib/userStoreRoles";
 import { jsonResponse } from "../../../../../../lib/http";
 import { coercePermissionFlags, normalizeStoreMemberRole } from "../../../../../../lib/permissions";
 import type { PermissionFlag } from "../../../../../../types/permissions";

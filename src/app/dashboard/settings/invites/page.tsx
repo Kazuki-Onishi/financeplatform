@@ -23,7 +23,6 @@ interface ToastMessage {
 
 interface InviteListItem {
   id: string;
-  token: string;
   code: string;
   link: string;
   role: StoreMemberRole;
@@ -76,7 +75,6 @@ const EXPIRES_VALUES = ["7", "30", "90", "0"] as const;
 function mapInviteRecord(record: StoreInviteRecord): InviteListItem {
   return {
     id: record.id,
-    token: record.token ?? "",
     code: record.code ?? "",
     link: record.link ?? "",
     role: (record.role as StoreMemberRole) ?? "staff",
